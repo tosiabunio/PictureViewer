@@ -149,6 +149,27 @@ struct FolderIcon: Shape {
   }
 }
 
+/// Down arrow beside an up arrow — sort order.
+struct SortIcon: Shape {
+  func path(in rect: CGRect) -> Path {
+    let scale = scaleFactors(in: rect)
+    var path = Path()
+    // Down arrow
+    path.move(to: scaledPoint(7, 4, scale))
+    path.addLine(to: scaledPoint(7, 20, scale))
+    path.move(to: scaledPoint(3, 16, scale))
+    path.addLine(to: scaledPoint(7, 20, scale))
+    path.addLine(to: scaledPoint(11, 16, scale))
+    // Up arrow
+    path.move(to: scaledPoint(17, 20, scale))
+    path.addLine(to: scaledPoint(17, 4, scale))
+    path.move(to: scaledPoint(13, 8, scale))
+    path.addLine(to: scaledPoint(17, 4, scale))
+    path.addLine(to: scaledPoint(21, 8, scale))
+    return path
+  }
+}
+
 /// Image frame with mountain + sun landscape sketch.
 struct ImageIcon: Shape {
   func path(in rect: CGRect) -> Path {

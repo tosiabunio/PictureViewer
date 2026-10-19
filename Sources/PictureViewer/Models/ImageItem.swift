@@ -26,6 +26,47 @@ struct ImageItem: Identifiable, Hashable {
   }
 }
 
+/// Order of images in the gallery and slideshow.
+enum ImageSortOrder: String, CaseIterable, Identifiable {
+  case nameAscending
+  case nameDescending
+  case newestFirst
+  case oldestFirst
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .nameAscending: return "Name (A–Z)"
+    case .nameDescending: return "Name (Z–A)"
+    case .newestFirst: return "Newest First"
+    case .oldestFirst: return "Oldest First"
+    }
+  }
+
+  /// Names compare like Finder ("page2" before "page10") and by full path, so
+  /// images in subfolders stay grouped. Date ties fall back to name, since
+  /// files extracted from an archive often share one modification time.
+  func areInIncreasingOrder(_ lhs: ImageItem, _ rhs: ImageItem) -> Bool {
+    switch self {
+    case .nameAscending:
+      return Self.compareNames(lhs, rhs) == .orderedAscending
+    case .nameDescending:
+      return Self.compareNames(lhs, rhs) == .orderedDescending
+    case .newestFirst where lhs.modificationDate != rhs.modificationDate:
+      return lhs.modificationDate > rhs.modificationDate
+    case .oldestFirst where lhs.modificationDate != rhs.modificationDate:
+      return lhs.modificationDate < rhs.modificationDate
+    case .newestFirst, .oldestFirst:
+      return Self.compareNames(lhs, rhs) == .orderedAscending
+    }
+  }
+
+  private static func compareNames(_ lhs: ImageItem, _ rhs: ImageItem) -> ComparisonResult {
+    lhs.url.path.localizedStandardCompare(rhs.url.path)
+  }
+}
+
 /// The animation types that cycle during slideshow transitions.
 ///
 /// `flip`, `bend`, and `curl` are single-effect transitions.

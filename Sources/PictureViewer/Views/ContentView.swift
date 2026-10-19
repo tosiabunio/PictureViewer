@@ -17,6 +17,7 @@ struct ContentView: View {
           imageCount: imageStore.images.count,
           folderName: imageStore.folderName,
           folderPath: imageStore.folderURL.path,
+          sortOrder: $imageStore.sortOrder,
           onChooseFolder: { imageStore.chooseFolder() },
           onPlaySlideshow: {
             guard !imageStore.images.isEmpty else { return }

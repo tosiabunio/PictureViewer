@@ -15,15 +15,17 @@ struct PictureViewerApp: App {
     .windowStyle(.hiddenTitleBar)
     .defaultSize(width: 1440, height: 900)
     .commands {
-      FolderCommands(imageStore: imageStore)
+      GalleryCommands(imageStore: imageStore)
     }
   }
 }
 
 // MARK: - Commands
 
-/// File-menu commands for choosing which folder the gallery browses.
-struct FolderCommands: Commands {
+/// Menu commands for choosing the gallery's folder and sort order.
+///
+/// Disabled while a slideshow is open, since it indexes into the image list.
+struct GalleryCommands: Commands {
   @ObservedObject var imageStore: ImageStore
   @FocusedValue(\.isSlideshowShowing) private var isSlideshowShowing
 
@@ -35,6 +37,15 @@ struct FolderCommands: Commands {
 
       Button("Show Pictures Folder") { imageStore.usePicturesFolder() }
         .disabled(isSlideshowShowing == true || imageStore.isShowingPicturesFolder)
+    }
+
+    CommandGroup(before: .toolbar) {
+      Picker("Sort By", selection: $imageStore.sortOrder) {
+        ForEach(ImageSortOrder.allCases) { order in
+          Text(order.title).tag(order)
+        }
+      }
+      .disabled(isSlideshowShowing == true)
     }
   }
 }

@@ -14,6 +14,10 @@ Built with Swift, SwiftUI, and Core Animation. Reads images from the user's Pict
 
 The gallery starts in your Pictures folder. Click the folder button in the header, or use **File ▸ Open Folder…** (⌘O), to browse any other folder; subfolders are scanned recursively. The choice is remembered across launches. **File ▸ Show Pictures Folder** switches back.
 
+## Sorting
+
+Use the sort menu in the header, or **View ▸ Sort By**, to order pictures by name (A–Z or Z–A) or by modification date (newest or oldest first). Names sort the way Finder does, so `page2` comes before `page10`, and pictures in subfolders stay grouped together. Pictures with the same modification date are ordered by name. The choice is remembered across launches.
+
 ## Transition Effects
 
 The slideshow cycles through eight GPU-composited transition effects:

@@ -11,17 +11,28 @@ final class ImageStore: ObservableObject {
   @Published var errorMessage: String?
   /// Folder currently being browsed. Persisted across launches.
   @Published private(set) var folderURL: URL
+  /// Persisted across launches.
+  @Published var sortOrder: ImageSortOrder {
+    didSet {
+      UserDefaults.standard.set(sortOrder.rawValue, forKey: Self.sortOrderDefaultsKey)
+      images.sort(by: sortOrder.areInIncreasingOrder)
+    }
+  }
 
   private static nonisolated let supportedExtensions: Set<String> = [
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "heic", "heif",
   ]
 
   private static let folderDefaultsKey = "imageFolderPath"
+  private static let sortOrderDefaultsKey = "imageSortOrder"
 
   private var thumbnailCache: [URL: NSImage] = [:]
 
   init() {
     folderURL = Self.savedFolder() ?? URL.picturesDirectory
+    sortOrder =
+      UserDefaults.standard.string(forKey: Self.sortOrderDefaultsKey)
+      .flatMap(ImageSortOrder.init(rawValue:)) ?? .newestFirst
   }
 
   // MARK: - Public API
@@ -45,7 +56,7 @@ final class ImageStore: ObservableObject {
       let items = try await scanDirectory(folder)
       // Another folder was chosen mid-scan; its own load publishes the results.
       guard folder == folderURL else { return }
-      images = items.sorted { $0.modificationDate > $1.modificationDate }
+      images = items.sorted(by: sortOrder.areInIncreasingOrder)
     } catch {
       guard folder == folderURL else { return }
       errorMessage = "Failed to load images: \(error.localizedDescription)"
