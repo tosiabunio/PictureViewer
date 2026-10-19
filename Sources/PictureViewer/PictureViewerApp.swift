@@ -60,10 +60,20 @@ struct GalleryCommands: Commands {
 /// Registers bundled fonts and enters full screen on launch.
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private var didEnterFullScreen = false
+  private var isFullScreenPending = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     registerBundledFonts()
     registerAppIcon()
+
+    // Count full screen as done only once a window actually starts entering it,
+    // so an attempt that never takes effect is retried when the window is next key.
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(windowWillEnterFullScreen),
+      name: NSWindow.willEnterFullScreenNotification,
+      object: nil
+    )
 
     // SwiftUI usually creates and keys the window before this runs, so its
     // didBecomeKey notification has already fired by the time we observe.
@@ -84,17 +94,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     enterFullScreenOnce(window)
   }
 
+  @objc @MainActor private func windowWillEnterFullScreen(_ notification: Notification) {
+    didEnterFullScreen = true
+  }
+
   /// Enters full screen the first time a gallery window becomes key.
   ///
   /// Panels such as the folder picker are skipped: full-screening one moves it
   /// into its own Space, which is left empty (black) once the panel closes.
   @MainActor private func enterFullScreenOnce(_ window: NSWindow) {
-    guard !didEnterFullScreen, !(window is NSPanel) else { return }
-    didEnterFullScreen = true
+    guard !didEnterFullScreen, !isFullScreenPending, !(window is NSPanel) else { return }
+    isFullScreenPending = true
     // Ensure the window supports full screen, then enter after a short layout delay.
     window.collectionBehavior.insert(.fullScreenPrimary)
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-      window.toggleFullScreen(nil)
+      self.isFullScreenPending = false
+      guard !self.didEnterFullScreen else { return }
+      // toggleFullScreen on a window that is already full screen would exit it.
+      if window.styleMask.contains(.fullScreen) {
+        self.didEnterFullScreen = true
+      } else {
+        window.toggleFullScreen(nil)
+      }
     }
   }
 
