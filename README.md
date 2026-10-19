@@ -18,6 +18,16 @@ The gallery starts in your Pictures folder. Click the folder button in the heade
 
 Use the sort menu in the header, or **View ▸ Sort By**, to order pictures by name (A–Z or Z–A) or by modification date (newest or oldest first). Names sort the way Finder does, so `page2` comes before `page10`, and pictures in subfolders stay grouped together. Pictures with the same modification date are ordered by name. The choice is remembered across launches.
 
+## Slideshow Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| ← / ↑ | Previous picture |
+| → / ↓ | Next picture |
+| Home / End | First / last picture |
+| Space | Play / pause |
+| Esc | Close slideshow |
+
 ## Transition Effects
 
 The slideshow cycles through eight GPU-composited transition effects:

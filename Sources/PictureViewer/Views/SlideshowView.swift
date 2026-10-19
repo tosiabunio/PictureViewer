@@ -26,6 +26,9 @@ struct SlideshowView: View {
   // Timer for auto-advance
   @State private var slideTimer: Timer?
 
+  /// `onKeyPress` only fires for a focused view, so the slideshow takes focus on appear.
+  @FocusState private var isFocused: Bool
+
   var body: some View {
     ZStack {
       // Glow background
@@ -61,17 +64,29 @@ struct SlideshowView: View {
     )
     .onAppear {
       setupInitialState()
+      isFocused = true
     }
     .onDisappear {
       stopAutoPlay()
     }
+    .focusable()
+    .focusEffectDisabled()
+    .focused($isFocused)
     // Keyboard navigation
-    .onKeyPress(.leftArrow) {
+    .onKeyPress(keys: [.leftArrow, .upArrow]) { _ in
       navigatePrev()
       return .handled
     }
-    .onKeyPress(.rightArrow) {
+    .onKeyPress(keys: [.rightArrow, .downArrow]) { _ in
       navigateNext()
+      return .handled
+    }
+    .onKeyPress(.home) {
+      navigateToFirst()
+      return .handled
+    }
+    .onKeyPress(.end) {
+      navigateToLast()
       return .handled
     }
     .onKeyPress(.space) {
@@ -234,6 +249,16 @@ extension SlideshowView {
     guard !isAnimating, currentIndex != 0 else { return }
     navigatingForward = false
     advanceSlide(to: 0)
+    if isPlaying {
+      restartAutoPlayTimer()
+    }
+  }
+
+  private func navigateToLast() {
+    let lastIndex = imageStore.images.count - 1
+    guard !isAnimating, currentIndex < lastIndex else { return }
+    navigatingForward = true
+    advanceSlide(to: lastIndex)
     if isPlaying {
       restartAutoPlayTimer()
     }
