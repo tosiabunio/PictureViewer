@@ -67,7 +67,7 @@ enum ImageSortOrder: String, CaseIterable, Identifiable {
   }
 }
 
-/// The animation types that cycle during slideshow transitions.
+/// The slideshow's transition effects; see `SlideTransitionChoice` for which one is used.
 ///
 /// `flip`, `bend`, and `curl` are single-effect transitions.
 /// `book` is a realistic page turn — `pageCurl` going forward, `pageUnCurl` going
@@ -77,7 +77,7 @@ enum ImageSortOrder: String, CaseIterable, Identifiable {
 /// `zoomFront` scales the old image toward the viewer while fading out.
 /// `pixelate` progressively pixelates the old image then dissolves it.
 /// `spiral` reveals tiles in clockwise spiral order from outer edge inward.
-enum SlideAnimationType: CaseIterable {
+enum SlideAnimationType: String, CaseIterable, Identifiable {
   case flip
   case bend
   case curl
@@ -86,4 +86,67 @@ enum SlideAnimationType: CaseIterable {
   case zoomFront
   case pixelate
   case spiral
+
+  var id: Self { self }
+
+  /// Name shown in the transition menus.
+  var title: String {
+    switch self {
+    case .flip: return "Flip"
+    case .bend: return "Bend"
+    case .curl: return "Curl"
+    case .book: return "Book"
+    case .blocks: return "Blocks"
+    case .zoomFront: return "Zoom"
+    case .pixelate: return "Pixelate"
+    case .spiral: return "Spiral"
+    }
+  }
+}
+
+/// Which transition the slideshow uses: every effect in turn, or always the same one.
+///
+/// Stored in UserDefaults as its raw value — `cycle`, or the effect's raw value.
+enum SlideTransitionChoice: Hashable {
+  case cycle
+  case fixed(SlideAnimationType)
+
+  static let defaultsKey = "slideTransition"
+
+  var title: String {
+    switch self {
+    case .cycle: return "Cycle Through All"
+    case .fixed(let type): return type.title
+    }
+  }
+
+  /// The effect for the slideshow's `index`-th transition.
+  func animationType(forTransition index: Int) -> SlideAnimationType {
+    switch self {
+    case .cycle:
+      let allTypes = SlideAnimationType.allCases
+      return allTypes[index % allTypes.count]
+    case .fixed(let type):
+      return type
+    }
+  }
+}
+
+extension SlideTransitionChoice: RawRepresentable {
+  init?(rawValue: String) {
+    if rawValue == "cycle" {
+      self = .cycle
+    } else if let type = SlideAnimationType(rawValue: rawValue) {
+      self = .fixed(type)
+    } else {
+      return nil
+    }
+  }
+
+  var rawValue: String {
+    switch self {
+    case .cycle: return "cycle"
+    case .fixed(let type): return type.rawValue
+    }
+  }
 }

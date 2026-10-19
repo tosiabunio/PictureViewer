@@ -17,11 +17,14 @@ struct SlideshowView: View {
   @State private var isPlaying = false
   @State private var isAnimating = false
   @State private var animCycleIdx = 0
+  @State private var currentAnimationType = SlideAnimationType.flip
   @State private var glowCycleIdx = 0
   @State private var navigatingForward = true
   @State private var currentNSImage: NSImage?
   @State private var currentImageSize: CGSize = .zero
   @State private var isSpeedy = false
+  @AppStorage(SlideTransitionChoice.defaultsKey)
+  private var transitionChoice = SlideTransitionChoice.cycle
 
   // Timer for auto-advance
   @State private var slideTimer: Timer?
@@ -202,6 +205,7 @@ struct SlideshowView: View {
       filename: currentFilename,
       isPlaying: isPlaying,
       isSpeedy: isSpeedy,
+      transition: $transitionChoice,
       onClose: onDismiss,
       onGoToFirst: navigateToFirst,
       onPrev: navigatePrev,
@@ -214,10 +218,6 @@ struct SlideshowView: View {
   }
 
   // MARK: - State
-
-  private var currentAnimationType: SlideAnimationType {
-    SlideAnimationType.allCases[animCycleIdx % SlideAnimationType.allCases.count]
-  }
 
   /// Current image filename for display.
   private var currentFilename: String {
@@ -297,6 +297,8 @@ extension SlideshowView {
     currentNSImage = targetImage
     currentImageSize = targetImage?.size ?? .zero
     animCycleIdx += 1
+    // Picked per slide, so changing the setting never re-animates the current image.
+    currentAnimationType = transitionChoice.animationType(forTransition: animCycleIdx)
     glowCycleIdx += 1
 
     // Reset animation flag after transition completes

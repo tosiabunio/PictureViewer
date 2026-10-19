@@ -22,12 +22,15 @@ struct PictureViewerApp: App {
 
 // MARK: - Commands
 
-/// Menu commands for choosing the gallery's folder and sort order.
+/// Menu commands for choosing the gallery's folder, sort order, and slideshow transition.
 ///
-/// Disabled while a slideshow is open, since it indexes into the image list.
+/// Folder and sort commands are disabled while a slideshow is open, since it
+/// indexes into the image list.
 struct GalleryCommands: Commands {
   @ObservedObject var imageStore: ImageStore
   @FocusedValue(\.isSlideshowShowing) private var isSlideshowShowing
+  @AppStorage(SlideTransitionChoice.defaultsKey)
+  private var transitionChoice = SlideTransitionChoice.cycle
 
   var body: some Commands {
     CommandGroup(after: .newItem) {
@@ -46,6 +49,8 @@ struct GalleryCommands: Commands {
         }
       }
       .disabled(isSlideshowShowing == true)
+
+      TransitionPicker(title: "Slideshow Transition", selection: $transitionChoice)
     }
   }
 }

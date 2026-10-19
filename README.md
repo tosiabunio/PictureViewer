@@ -30,7 +30,7 @@ Use the sort menu in the header, or **View ▸ Sort By**, to order pictures by n
 
 ## Transition Effects
 
-The slideshow cycles through eight GPU-composited transition effects:
+By default the slideshow cycles through eight GPU-composited transition effects. To use just one, pick it from the page-turn button in the slideshow's control bar or from **View ▸ Slideshow Transition**; **Cycle Through All** switches back. The choice is remembered across launches.
 
 ### Flip
 

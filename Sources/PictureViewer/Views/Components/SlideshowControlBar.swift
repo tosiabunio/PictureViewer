@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// Capsule-shaped control bar — close, left, play, stop, right, speed, delete.
+/// Capsule-shaped control bar — close, left, play, stop, right, speed, transition, delete.
 ///
 /// All icons are line-only to match the sketchbook aesthetic.
 struct SlideshowControlBar: View {
   let filename: String
   let isPlaying: Bool
   let isSpeedy: Bool
+  @Binding var transition: SlideTransitionChoice
   let onClose: () -> Void
   let onGoToFirst: () -> Void
   let onPrev: () -> Void
@@ -107,6 +108,30 @@ struct SlideshowControlBar: View {
             size: 18
           )
       }
+
+      // Transition effect — highlighted when a single effect is chosen
+      Menu {
+        TransitionPicker(selection: $transition)
+          .pickerStyle(.inline)
+      } label: {
+        PageTurnIcon()
+          .lineIconStyle(
+            color: transition == .cycle ? DesignSystem.textColor : DesignSystem.slideshowButton,
+            size: 18
+          )
+          .frame(width: 36, height: 36)
+          .background(
+            Circle()
+              .fill(transition == .cycle ? .clear : DesignSystem.primary.opacity(0.4))
+              .frame(width: 32, height: 32)
+          )
+          .contentShape(Circle())
+      }
+      .menuStyle(.button)
+      .buttonStyle(.plain)
+      .menuIndicator(.hidden)
+      .fixedSize()
+      .help("Transition: \(transition.title)")
 
       // Delete
       controlButton(action: onDelete) {

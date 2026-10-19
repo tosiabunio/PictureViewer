@@ -302,6 +302,26 @@ struct SpeedIcon: Shape {
   }
 }
 
+/// Page with a folded corner — slideshow transition picker.
+struct PageTurnIcon: Shape {
+  func path(in rect: CGRect) -> Path {
+    let scale = scaleFactors(in: rect)
+    var path = Path()
+    // Page outline, bottom-right corner cut off
+    path.move(to: scaledPoint(5, 2, scale))
+    path.addLine(to: scaledPoint(19, 2, scale))
+    path.addLine(to: scaledPoint(19, 15, scale))
+    path.addLine(to: scaledPoint(12, 22, scale))
+    path.addLine(to: scaledPoint(5, 22, scale))
+    path.closeSubpath()
+    // Folded-over corner
+    path.move(to: scaledPoint(19, 15, scale))
+    path.addLine(to: scaledPoint(12, 15, scale))
+    path.addLine(to: scaledPoint(12, 22, scale))
+    return path
+  }
+}
+
 // MARK: - Coordinate helpers
 
 /// Scale factors to map from the 24x24 viewBox into the actual rect.
