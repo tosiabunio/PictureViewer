@@ -2,35 +2,74 @@ import AppKit
 import Foundation
 import SwiftUI
 
-/// Scans the user's Pictures folder for images and provides thumbnail generation.
+/// Scans the chosen folder (Pictures by default) for images and provides thumbnail generation.
 @MainActor
 final class ImageStore: ObservableObject {
 
   @Published var images: [ImageItem] = []
   @Published var isLoading = false
   @Published var errorMessage: String?
+  /// Folder currently being browsed. Persisted across launches.
+  @Published private(set) var folderURL: URL
 
   private static nonisolated let supportedExtensions: Set<String> = [
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "heic", "heif",
   ]
 
+  private static let folderDefaultsKey = "imageFolderPath"
+
   private var thumbnailCache: [URL: NSImage] = [:]
+
+  init() {
+    folderURL = Self.savedFolder() ?? URL.picturesDirectory
+  }
 
   // MARK: - Public API
 
+  /// Folder name as Finder shows it.
+  var folderName: String {
+    FileManager.default.displayName(atPath: folderURL.path)
+  }
+
+  var isShowingPicturesFolder: Bool {
+    folderURL.standardizedFileURL.path == URL.picturesDirectory.standardizedFileURL.path
+  }
+
   func loadImages() async {
+    let folder = folderURL
     isLoading = true
     errorMessage = nil
 
     do {
-      let picturesURL = try picturesDirectory()
-      let items = try await scanDirectory(picturesURL)
+      try ensureDirectoryExists(folder)
+      let items = try await scanDirectory(folder)
+      // Another folder was chosen mid-scan; its own load publishes the results.
+      guard folder == folderURL else { return }
       images = items.sorted { $0.modificationDate > $1.modificationDate }
     } catch {
+      guard folder == folderURL else { return }
       errorMessage = "Failed to load images: \(error.localizedDescription)"
     }
 
     isLoading = false
+  }
+
+  /// Presents an open panel and switches to the folder the user picks.
+  func chooseFolder() {
+    let panel = NSOpenPanel()
+    panel.title = "Choose a Folder"
+    panel.prompt = "Choose"
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.allowsMultipleSelection = false
+    panel.directoryURL = folderURL
+
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    selectFolder(url)
+  }
+
+  func usePicturesFolder() {
+    selectFolder(URL.picturesDirectory)
   }
 
   /// Returns a cached thumbnail or generates one on demand.
@@ -61,13 +100,36 @@ final class ImageStore: ObservableObject {
 
   // MARK: - Private
 
-  private func picturesDirectory() throws -> URL {
-    let fileManager = FileManager.default
-    let url = fileManager.urls(for: .picturesDirectory, in: .userDomainMask).first
-    guard let picturesURL = url, fileManager.fileExists(atPath: picturesURL.path) else {
-      throw ImageStoreError.picturesNotFound
+  private func selectFolder(_ url: URL) {
+    folderURL = url
+    if isShowingPicturesFolder {
+      UserDefaults.standard.removeObject(forKey: Self.folderDefaultsKey)
+    } else {
+      UserDefaults.standard.set(url.path, forKey: Self.folderDefaultsKey)
     }
-    return picturesURL
+
+    images = []
+    thumbnailCache.removeAll()
+    Task { await loadImages() }
+  }
+
+  /// The previously chosen folder, if one was saved and still exists.
+  private static func savedFolder() -> URL? {
+    guard let path = UserDefaults.standard.string(forKey: folderDefaultsKey) else { return nil }
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+      isDirectory.boolValue
+    else { return nil }
+    return URL(fileURLWithPath: path, isDirectory: true)
+  }
+
+  private func ensureDirectoryExists(_ url: URL) throws {
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+      isDirectory.boolValue
+    else {
+      throw ImageStoreError.folderNotFound(url)
+    }
   }
 
   private func scanDirectory(_ root: URL) async throws -> [ImageItem] {
@@ -120,12 +182,12 @@ final class ImageStore: ObservableObject {
 // MARK: - Errors
 
 enum ImageStoreError: LocalizedError {
-  case picturesNotFound
+  case folderNotFound(URL)
 
   var errorDescription: String? {
     switch self {
-    case .picturesNotFound:
-      return "Could not locate the Pictures folder."
+    case .folderNotFound(let url):
+      return "Could not locate the folder at \(url.path)."
     }
   }
 }

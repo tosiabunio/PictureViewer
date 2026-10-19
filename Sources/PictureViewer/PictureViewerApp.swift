@@ -14,6 +14,28 @@ struct PictureViewerApp: App {
     }
     .windowStyle(.hiddenTitleBar)
     .defaultSize(width: 1440, height: 900)
+    .commands {
+      FolderCommands(imageStore: imageStore)
+    }
+  }
+}
+
+// MARK: - Commands
+
+/// File-menu commands for choosing which folder the gallery browses.
+struct FolderCommands: Commands {
+  @ObservedObject var imageStore: ImageStore
+  @FocusedValue(\.isSlideshowShowing) private var isSlideshowShowing
+
+  var body: some Commands {
+    CommandGroup(after: .newItem) {
+      Button("Open Folder…") { imageStore.chooseFolder() }
+        .keyboardShortcut("o")
+        .disabled(isSlideshowShowing == true)
+
+      Button("Show Pictures Folder") { imageStore.usePicturesFolder() }
+        .disabled(isSlideshowShowing == true || imageStore.isShowingPicturesFolder)
+    }
   }
 }
 

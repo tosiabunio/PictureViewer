@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// Top header bar with title, image count, and play button.
+/// Top header bar with title, image count, folder picker, and play button.
 ///
 /// 60:30:10 — header background is **30 %** (blue-tinted cream),
 /// play button is **10 %** (accent lavender).
 struct HeaderView: View {
   let imageCount: Int
+  let folderName: String
+  let folderPath: String
+  let onChooseFolder: () -> Void
   let onPlaySlideshow: () -> Void
 
   /// App version from the main bundle's Info.plist.
@@ -39,6 +42,30 @@ struct HeaderView: View {
       }
 
       Spacer()
+
+      Button(action: onChooseFolder) {
+        HStack(spacing: 6) {
+          FolderIcon()
+            .lineIconStyle(color: DesignSystem.slideshowButton, size: 14)
+          Text(folderName)
+            .font(DesignSystem.bodyFont)
+            .lineLimit(1)
+            .truncationMode(.middle)
+        }
+        .foregroundColor(DesignSystem.textColor)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+          RoundedRectangle(cornerRadius: DesignSystem.cornerRadius)
+            .fill(Color.white.opacity(0.6))
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: DesignSystem.cornerRadius)
+            .stroke(DesignSystem.border, lineWidth: 1)
+        )
+      }
+      .buttonStyle(.plain)
+      .help("\(folderPath)\nClick to choose another folder (⌘O)")
 
       if imageCount > 0 {
         Button(action: onPlaySlideshow) {

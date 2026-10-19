@@ -15,6 +15,9 @@ struct ContentView: View {
       VStack(spacing: 0) {
         HeaderView(
           imageCount: imageStore.images.count,
+          folderName: imageStore.folderName,
+          folderPath: imageStore.folderURL.path,
+          onChooseFolder: { imageStore.chooseFolder() },
           onPlaySlideshow: {
             guard !imageStore.images.isEmpty else { return }
             selectedImage = imageStore.images.first
@@ -25,7 +28,7 @@ struct ContentView: View {
 
         if imageStore.isLoading {
           Spacer()
-          ProgressView("Scanning Pictures folder...")
+          ProgressView("Scanning \(imageStore.folderName)...")
             .font(DesignSystem.bodyFont)
             .foregroundColor(DesignSystem.textColor)
           Spacer()
@@ -44,7 +47,7 @@ struct ContentView: View {
           VStack(spacing: 12) {
             ImageIcon()
               .lineIconStyle(color: DesignSystem.primary, size: 40)
-            Text("No pictures found in your Pictures folder.")
+            Text("No pictures found in \(imageStore.folderName).")
               .font(DesignSystem.bodyFont)
               .foregroundColor(DesignSystem.textColor)
           }
@@ -80,5 +83,21 @@ struct ContentView: View {
     .task {
       await imageStore.loadImages()
     }
+    .focusedSceneValue(\.isSlideshowShowing, showSlideshow)
+  }
+}
+
+// MARK: - Focused Values
+
+/// Lets menu commands know whether the focused window is showing a slideshow,
+/// so folder changes can't swap the image list out from under it.
+struct SlideshowShowingKey: FocusedValueKey {
+  typealias Value = Bool
+}
+
+extension FocusedValues {
+  var isSlideshowShowing: Bool? {
+    get { self[SlideshowShowingKey.self] }
+    set { self[SlideshowShowingKey.self] = newValue }
   }
 }

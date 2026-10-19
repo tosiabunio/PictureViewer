@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// A single image discovered in the Pictures folder.
+/// A single image discovered in the browsed folder.
 struct ImageItem: Identifiable, Hashable {
   let id: UUID
   let url: URL

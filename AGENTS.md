@@ -30,7 +30,7 @@ This repository contains `PictureViewer`, a native macOS application for viewing
 
 The Swift rewrite uses **Core Animation** (`CATransition` with `pageCurl`, `oglFlip`) for GPU-composited transitions that run on the compositor thread with zero jank.
 
-- **Reads** pictures from the user's Pictures folder on macOS
+- **Reads** pictures from the user's Pictures folder on macOS, or another folder chosen via File ▸ Open Folder… (persisted in UserDefaults)
 - **Displays** images in a pastel-toned, sketchbook-style gallery
 - **Provides** a fullscreen slideshow with flip, bend, and curl page-turn transitions
 - **Uses** SF Symbols for UI controls
@@ -50,7 +50,7 @@ PictureViewer/
 │   ├── Models/
 │   │   └── ImageItem.swift                 # Image model + SlideAnimationType enum
 │   ├── Services/
-│   │   └── ImageStore.swift                # Pictures folder scanner + thumbnail cache
+│   │   └── ImageStore.swift                # Folder scanner (Pictures by default) + thumbnail cache
 │   ├── Views/
 │   │   ├── ContentView.swift               # Root view (gallery + slideshow overlay)
 │   │   ├── GalleryView.swift               # LazyVGrid thumbnail gallery
