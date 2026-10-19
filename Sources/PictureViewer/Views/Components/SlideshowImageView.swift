@@ -13,6 +13,8 @@ import SwiftUI
 struct SlideshowImageView: NSViewRepresentable {
   let image: NSImage?
   let animationType: SlideAnimationType
+  /// Length of the transition — shorter in speedy mode.
+  let duration: TimeInterval
   let isForward: Bool
   @Binding var isAnimating: Bool
 
@@ -45,12 +47,18 @@ struct SlideshowImageView: NSViewRepresentable {
     guard let newImage = image else {
       CATransaction.begin()
       CATransaction.setDisableActions(true)
+      nsView.displayedImage = nil
       nsView.currentImageSize = .zero
       imageLayer.frame = rootLayer.bounds
       imageLayer.contents = nil
       CATransaction.commit()
       return
     }
+
+    // SwiftUI also calls this when unrelated slideshow state changes (play, speed,
+    // transition setting); only a new image should start a transition.
+    guard newImage !== nsView.displayedImage else { return }
+    nsView.displayedImage = newImage
 
     // Store image size so layout() can recalculate on container resize
     nsView.currentImageSize = newImage.size
@@ -76,7 +84,7 @@ struct SlideshowImageView: NSViewRepresentable {
     case (.flip, true), (.bend, true), (.curl, true), (.book, true):
       // CATransition-based transitions
       let transition = CATransition()
-      transition.duration = transitionDuration
+      transition.duration = duration
       transition.timingFunction = timingFunction
       transition.type = caTransitionType
       transition.subtype = caTransitionSubtype
@@ -96,19 +104,6 @@ struct SlideshowImageView: NSViewRepresentable {
       imageLayer.frame = nsView.fittedImageRect
       CATransaction.commit()
       imageLayer.contents = newImage.asCGImage
-    }
-  }
-
-  private var transitionDuration: CFTimeInterval {
-    switch animationType {
-    case .flip: return DesignSystem.flipDuration
-    case .bend: return DesignSystem.bendDuration
-    case .curl: return DesignSystem.curlDuration
-    case .book: return DesignSystem.bookDuration
-    case .blocks: return DesignSystem.blocksDuration
-    case .zoomFront: return DesignSystem.zoomFrontDuration
-    case .pixelate: return DesignSystem.pixelateDuration
-    case .spiral: return DesignSystem.spiralDuration
     }
   }
 
@@ -165,6 +160,8 @@ struct SlideshowImageView: NSViewRepresentable {
 /// (and its curl/flip transitions) always matches the visible image bounds.
 class SlideshowContainerView: NSView {
   var currentImageSize: CGSize = .zero
+  /// The image on screen, so updates that don't change it skip the transition.
+  var displayedImage: NSImage?
 
   override func layout() {
     super.layout()

@@ -52,8 +52,9 @@ extension SlideshowImageView {
     let tileW = rect.width / CGFloat(cols)
     let tileH = rect.height / CGFloat(rows)
 
-    let totalDuration = DesignSystem.blocksDuration
-    let fadeDuration = DesignSystem.blocksBlockFade
+    let totalDuration = duration
+    // Scaled with the total, so speedy mode plays the same stagger faster.
+    let fadeDuration = DesignSystem.blocksBlockFade * duration / DesignSystem.blocksDuration
     let maxDelay = totalDuration - fadeDuration
 
     for row in 0..<rows {
@@ -107,8 +108,6 @@ extension SlideshowImageView {
     removeTransitionSublayers(named: "zoomSnapshot", from: imageLayer)
     guard let cgImage = oldImage else { return }
 
-    let duration = DesignSystem.zoomFrontDuration
-
     let snapshot = CALayer()
     snapshot.name = "zoomSnapshot"
     snapshot.frame = imageLayer.bounds
@@ -152,8 +151,6 @@ extension SlideshowImageView {
   ) {
     removeTransitionSublayers(named: "pixelSnapshot", from: imageLayer)
     guard let cgImage = oldImage else { return }
-
-    let duration = DesignSystem.pixelateDuration
 
     let snapshot = CALayer()
     snapshot.name = "pixelSnapshot"
@@ -230,8 +227,9 @@ extension SlideshowImageView {
     let tileW = rect.width / CGFloat(cols)
     let tileH = rect.height / CGFloat(rows)
 
-    let totalDuration = DesignSystem.spiralDuration
-    let fadeDuration = DesignSystem.blocksBlockFade
+    let totalDuration = duration
+    // Scaled with the total, so speedy mode plays the same stagger faster.
+    let fadeDuration = DesignSystem.blocksBlockFade * duration / DesignSystem.spiralDuration
     let maxDelay = totalDuration - fadeDuration
 
     let order = spiralOrder(rows: rows, cols: cols)

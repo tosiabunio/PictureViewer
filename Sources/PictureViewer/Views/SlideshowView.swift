@@ -18,6 +18,7 @@ struct SlideshowView: View {
   @State private var isAnimating = false
   @State private var animCycleIdx = 0
   @State private var currentAnimationType = SlideAnimationType.flip
+  @State private var currentTransitionDuration = DesignSystem.flipDuration
   @State private var glowCycleIdx = 0
   @State private var navigatingForward = true
   @State private var currentNSImage: NSImage?
@@ -125,6 +126,7 @@ struct SlideshowView: View {
       SlideshowImageView(
         image: currentNSImage,
         animationType: currentAnimationType,
+        duration: currentTransitionDuration,
         isForward: navigatingForward,
         isAnimating: $isAnimating
       )
@@ -297,8 +299,9 @@ extension SlideshowView {
     currentNSImage = targetImage
     currentImageSize = targetImage?.size ?? .zero
     animCycleIdx += 1
-    // Picked per slide, so changing the setting never re-animates the current image.
+    // Picked per slide, so a change of setting or speed applies from the next slide.
     currentAnimationType = transitionChoice.animationType(forTransition: animCycleIdx)
+    currentTransitionDuration = transitionDuration(for: currentAnimationType)
     glowCycleIdx += 1
 
     // Reset animation flag after transition completes
@@ -307,9 +310,9 @@ extension SlideshowView {
     }
   }
 
-  private var currentTransitionDuration: TimeInterval {
+  private func transitionDuration(for type: SlideAnimationType) -> TimeInterval {
     if isSpeedy {
-      switch currentAnimationType {
+      switch type {
       case .flip: return DesignSystem.speedyFlipDuration
       case .bend: return DesignSystem.speedyBendDuration
       case .curl: return DesignSystem.speedyCurlDuration
@@ -320,7 +323,7 @@ extension SlideshowView {
       case .spiral: return DesignSystem.speedySpiralDuration
       }
     } else {
-      switch currentAnimationType {
+      switch type {
       case .flip: return DesignSystem.flipDuration
       case .bend: return DesignSystem.bendDuration
       case .curl: return DesignSystem.curlDuration
