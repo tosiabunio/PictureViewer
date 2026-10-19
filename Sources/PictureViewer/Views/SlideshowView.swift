@@ -26,6 +26,17 @@ struct SlideshowView: View {
   @State private var isSpeedy = false
   @AppStorage(SlideTransitionChoice.defaultsKey)
   private var transitionChoice = SlideTransitionChoice.cycle
+  @StateObject private var zoom = SlideshowZoom()
+  /// In zoom mode the controls and arrow keys zoom and pan instead of switching pictures.
+  @State private var isZoomMode = false
+  /// The area between the bars where the unzoomed picture sits.
+  @State private var pageFrame: CGRect = .zero
+  /// Where the next picture starts while zoomed: reading order by direction.
+  @State private var zoomedStart = ZoomedPictureStart.topLeading
+
+  nonisolated private static let coordinateSpace = "slideshow"
+  /// Arrow-key pan distance, as a fraction of the visible area.
+  private static let keyPanStep: CGFloat = 0.15
 
   // Timer for auto-advance
   @State private var slideTimer: Timer?
@@ -40,15 +51,28 @@ struct SlideshowView: View {
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 1.2), value: glowCycleIdx)
 
-      // Main content — image + filename + controls
+      // Image — spans the whole slideshow so a zoomed picture can use all of it;
+      // unzoomed, the picture is fitted into the page area between the bars.
+      SlideshowImageView(
+        image: currentNSImage,
+        animationType: currentAnimationType,
+        duration: currentTransitionDuration,
+        isForward: navigatingForward,
+        pageFrame: pageFrame,
+        zoom: zoom,
+        zoomedStart: zoomedStart,
+        isAnimating: $isAnimating
+      )
+
+      // Main content — counter, page area, controls
       VStack(spacing: 0) {
         // Top bar — close and counter
         topBar
 
         Spacer(minLength: 8)
 
-        // Image — sketchbook frame with tape strips
-        slideshowFrame
+        // Page — sketchbook frame with tape strips
+        pageArea
 
         Spacer(minLength: 32)
 
@@ -58,6 +82,7 @@ struct SlideshowView: View {
       }
       .padding(.vertical, 12)
     }
+    .coordinateSpace(.named(Self.coordinateSpace))
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(
       LinearGradient(
@@ -73,15 +98,25 @@ struct SlideshowView: View {
     .onDisappear {
       stopAutoPlay()
     }
+    // Pinching or double-clicking the picture switches to zoom mode by itself.
+    .onChange(of: zoom.isZoomed) { _, isZoomed in
+      if isZoomed { enterZoomMode() }
+    }
     .focusable()
     .focusEffectDisabled()
     .focused($isFocused)
     // Keyboard navigation
-    .onKeyPress(keys: [.leftArrow, .upArrow]) { _ in
+    .onKeyPress(keys: [.leftArrow, .upArrow]) { press in
+      handleArrow(press, navigate: navigatePrev)
+    }
+    .onKeyPress(keys: [.rightArrow, .downArrow]) { press in
+      handleArrow(press, navigate: navigateNext)
+    }
+    .onKeyPress(.pageUp) {
       navigatePrev()
       return .handled
     }
-    .onKeyPress(keys: [.rightArrow, .downArrow]) { _ in
+    .onKeyPress(.pageDown) {
       navigateNext()
       return .handled
     }
@@ -94,11 +129,28 @@ struct SlideshowView: View {
       return .handled
     }
     .onKeyPress(.space) {
-      togglePlayPause()
+      if !isZoomMode { togglePlayPause() }
+      return .handled
+    }
+    .onKeyPress(characters: CharacterSet(charactersIn: "zZ"), phases: .down) { _ in
+      toggleZoomMode()
+      return .handled
+    }
+    .onKeyPress(characters: CharacterSet(charactersIn: "+=")) { _ in
+      enterZoomMode()
+      zoom.zoomIn()
+      return .handled
+    }
+    .onKeyPress(characters: CharacterSet(charactersIn: "-_")) { _ in
+      if isZoomMode { zoom.zoomOut() }
+      return .handled
+    }
+    .onKeyPress(characters: CharacterSet(charactersIn: "0")) { _ in
+      if isZoomMode { zoom.fit() }
       return .handled
     }
     .onKeyPress(.escape) {
-      onDismiss()
+      if isZoomMode { exitZoomMode() } else { onDismiss() }
       return .handled
     }
   }
@@ -118,35 +170,39 @@ struct SlideshowView: View {
       )
   }
 
-  /// Sketchbook-style image — washi-tape strips positioned at the actual image edges.
-  private var slideshowFrame: some View {
+  /// Sketchbook-style page — washi-tape strips positioned at the actual image edges.
+  ///
+  /// The picture itself is drawn by `SlideshowImageView` behind the bars; this
+  /// reports where it should sit and hides the tape while zoomed.
+  private var pageArea: some View {
     GeometryReader { geo in
       let insets = imageInsets(in: geo.size)
 
-      SlideshowImageView(
-        image: currentNSImage,
-        animationType: currentAnimationType,
-        duration: currentTransitionDuration,
-        isForward: navigatingForward,
-        isAnimating: $isAnimating
-      )
-      // Tape strip — top center, on actual image edge
-      .overlay(alignment: .top) {
-        TapeStrip(color: slideshowTopTape)
-          .scaleEffect(2.4)
-          .rotationEffect(.degrees(-7))
-          .offset(y: insets.top - 10)
-      }
-      // Tape strip — bottom right, on actual image corner
-      .overlay(alignment: .bottomTrailing) {
-        TapeStrip(color: slideshowBottomTape)
-          .scaleEffect(2.4)
-          .rotationEffect(.degrees(11))
-          .offset(
-            x: -(insets.trailing + 40),
-            y: -(insets.bottom - 10)
-          )
-      }
+      Color.clear
+        // Tape strip — top center, on actual image edge
+        .overlay(alignment: .top) {
+          TapeStrip(color: slideshowTopTape)
+            .scaleEffect(2.4)
+            .rotationEffect(.degrees(-7))
+            .offset(y: insets.top - 10)
+        }
+        // Tape strip — bottom right, on actual image corner
+        .overlay(alignment: .bottomTrailing) {
+          TapeStrip(color: slideshowBottomTape)
+            .scaleEffect(2.4)
+            .rotationEffect(.degrees(11))
+            .offset(
+              x: -(insets.trailing + 40),
+              y: -(insets.bottom - 10)
+            )
+        }
+        .opacity(zoom.isZoomed ? 0 : 1)
+        .animation(.easeInOut(duration: 0.2), value: zoom.isZoomed)
+    }
+    .onGeometryChange(for: CGRect.self) { proxy in
+      proxy.frame(in: .named(Self.coordinateSpace))
+    } action: { frame in
+      pageFrame = frame
     }
     .padding(.horizontal, 60)
   }
@@ -208,6 +264,8 @@ struct SlideshowView: View {
       isPlaying: isPlaying,
       isSpeedy: isSpeedy,
       transition: $transitionChoice,
+      isZoomMode: isZoomMode,
+      zoomScale: zoom.scale,
       onClose: onDismiss,
       onGoToFirst: navigateToFirst,
       onPrev: navigatePrev,
@@ -215,6 +273,10 @@ struct SlideshowView: View {
       onPlay: { if !isPlaying { startAutoPlay() } },
       onStop: { if isPlaying { stopAutoPlay() } },
       onToggleSpeed: toggleSpeedyMode,
+      onToggleZoomMode: toggleZoomMode,
+      onZoomIn: { zoom.zoomIn() },
+      onZoomOut: { zoom.zoomOut() },
+      onFit: { zoom.fit() },
       onDelete: deleteCurrentImage
     )
   }
@@ -250,6 +312,7 @@ extension SlideshowView {
   private func navigateToFirst() {
     guard !isAnimating, currentIndex != 0 else { return }
     navigatingForward = false
+    zoomedStart = .topLeading
     advanceSlide(to: 0)
     if isPlaying {
       restartAutoPlayTimer()
@@ -260,6 +323,7 @@ extension SlideshowView {
     let lastIndex = imageStore.images.count - 1
     guard !isAnimating, currentIndex < lastIndex else { return }
     navigatingForward = true
+    zoomedStart = .topLeading
     advanceSlide(to: lastIndex)
     if isPlaying {
       restartAutoPlayTimer()
@@ -269,6 +333,7 @@ extension SlideshowView {
   private func navigateNext() {
     guard !isAnimating else { return }
     navigatingForward = true
+    zoomedStart = .topLeading
     let nextIndex = (currentIndex + 1) % imageStore.images.count
     advanceSlide(to: nextIndex)
     if isPlaying {
@@ -279,6 +344,7 @@ extension SlideshowView {
   private func navigatePrev() {
     guard !isAnimating else { return }
     navigatingForward = false
+    zoomedStart = .bottomTrailing
     let prevIndex = (currentIndex - 1 + imageStore.images.count) % imageStore.images.count
     advanceSlide(to: prevIndex)
     if isPlaying {
@@ -333,6 +399,47 @@ extension SlideshowView {
       case .pixelate: return DesignSystem.pixelateDuration
       case .spiral: return DesignSystem.spiralDuration
       }
+    }
+  }
+
+  // MARK: Zoom mode
+
+  /// Stops auto-play, which would otherwise switch pictures mid-zoom.
+  private func enterZoomMode() {
+    guard !isZoomMode else { return }
+    isZoomMode = true
+    stopAutoPlay()
+  }
+
+  private func exitZoomMode() {
+    isZoomMode = false
+    zoom.fit()
+  }
+
+  private func toggleZoomMode() {
+    if isZoomMode { exitZoomMode() } else { enterZoomMode() }
+  }
+
+  /// Arrows switch pictures, except in zoom mode, where they pan. There,
+  /// Shift+arrow switches pictures, and so does a fresh press once the picture
+  /// can't pan any further that way; a held key stops at the edge.
+  private func handleArrow(_ press: KeyPress, navigate: () -> Void) -> KeyPress.Result {
+    if !isZoomMode || press.modifiers.contains(.shift) {
+      navigate()
+    } else if !pan(toward: press.key), press.phase == .down {
+      navigate()
+    }
+    return .handled
+  }
+
+  /// Returns false when the picture can't move that way.
+  private func pan(toward key: KeyEquivalent) -> Bool {
+    switch key {
+    case .leftArrow: return zoom.pan(x: -Self.keyPanStep, y: 0)
+    case .rightArrow: return zoom.pan(x: Self.keyPanStep, y: 0)
+    case .upArrow: return zoom.pan(x: 0, y: -Self.keyPanStep)
+    case .downArrow: return zoom.pan(x: 0, y: Self.keyPanStep)
+    default: return false
     }
   }
 

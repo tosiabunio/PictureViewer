@@ -51,6 +51,41 @@ struct ZoomOutIcon: Shape {
   }
 }
 
+/// Plain magnifying glass — slideshow zoom mode.
+struct MagnifierIcon: Shape {
+  func path(in rect: CGRect) -> Path {
+    let scale = scaleFactors(in: rect)
+    var path = Path()
+    path.addArc(
+      center: scaledPoint(11, 11, scale), radius: 8 * scale.scaleX,
+      startAngle: .zero, endAngle: .degrees(360), clockwise: false)
+    path.move(to: scaledPoint(21, 21, scale))
+    path.addLine(to: scaledPoint(16.65, 16.65, scale))
+    return path
+  }
+}
+
+/// Four corner brackets — fit the picture to the page.
+struct FitIcon: Shape {
+  func path(in rect: CGRect) -> Path {
+    let scale = scaleFactors(in: rect)
+    var path = Path()
+    path.move(to: scaledPoint(4, 9, scale))
+    path.addLine(to: scaledPoint(4, 4, scale))
+    path.addLine(to: scaledPoint(9, 4, scale))
+    path.move(to: scaledPoint(15, 4, scale))
+    path.addLine(to: scaledPoint(20, 4, scale))
+    path.addLine(to: scaledPoint(20, 9, scale))
+    path.move(to: scaledPoint(20, 15, scale))
+    path.addLine(to: scaledPoint(20, 20, scale))
+    path.addLine(to: scaledPoint(15, 20, scale))
+    path.move(to: scaledPoint(9, 20, scale))
+    path.addLine(to: scaledPoint(4, 20, scale))
+    path.addLine(to: scaledPoint(4, 15, scale))
+    return path
+  }
+}
+
 /// X mark — two crossed diagonal lines.
 struct CloseIcon: Shape {
   func path(in rect: CGRect) -> Path {

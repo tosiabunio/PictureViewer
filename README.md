@@ -22,11 +22,23 @@ Use the sort menu in the header, or **View ▸ Sort By**, to order pictures by n
 
 | Key | Action |
 |-----|--------|
-| ← / ↑ | Previous picture |
-| → / ↓ | Next picture |
+| ← / ↑ | Previous picture (pan while zoomed) |
+| → / ↓ | Next picture (pan while zoomed) |
+| Shift + arrows, Page Up / Page Down | Previous / next picture, also while zoomed |
 | Home / End | First / last picture |
 | Space | Play / pause |
-| Esc | Close slideshow |
+| Z | Zoom mode on / off |
+| + / − | Zoom in / out |
+| 0 | Fit the picture (in zoom mode) |
+| Esc | Leave zoom mode, or close slideshow |
+
+## Zoom and Pan
+
+Pinch the trackpad, double-click the picture (or double-tap with two fingers), or press **+** to zoom in; the slideshow switches to zoom mode on its own. A zoomed picture spreads over the whole slideshow, behind the controls. Scroll, drag, or use the arrow keys to pan around it.
+
+In zoom mode the control bar swaps the navigation buttons for previous, zoom out, the current zoom, zoom in, fit, and next, and auto-play pauses. Click the magnifier button, press **Z**, or press **Esc** to go back to browsing; the picture returns to fit. Zoom goes up to 4×, or further for large pictures, up to two screen pixels per picture pixel.
+
+Switching pictures keeps the zoom, in reading order: the next picture starts at its top-left, the previous one at its bottom-right. Besides the buttons, Page Up / Page Down and Shift + arrows switch pictures, and so does an arrow key once the picture can't pan any further that way — so pressing ↓ scrolls down a comic page and then turns to the next one. Holding an arrow key stops at the edge rather than turning pages.
 
 ## Transition Effects
 

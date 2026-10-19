@@ -8,27 +8,47 @@ import QuartzCore
 /// Each method creates snapshot layers of the old image, applies Core Animation
 /// effects, and cleans up after the transition completes. All animations run
 /// entirely on the GPU compositor thread — zero main-thread blocking.
+///
+/// Snapshots go on `host` and cover `rect` (in host coordinates), showing the
+/// `oldContentsRect` part of the old image: the whole image on the picture layer
+/// when unzoomed, or just the part that was on screen on the viewport when zoomed.
 extension SlideshowImageView {
 
   /// Route to the correct custom transition based on the current animation type.
   func dispatchCustomTransition(
-    oldImage: Any?, on imageLayer: CALayer, in rect: CGRect
+    oldImage: Any?, showing oldContentsRect: CGRect, on host: CALayer, in rect: CGRect
   ) {
     switch animationType {
     case .blocks:
-      performBlocksTransition(oldImage: oldImage, on: imageLayer, in: rect)
+      performBlocksTransition(
+        oldImage: oldImage, showing: oldContentsRect, on: host, in: rect)
     case .zoomFront:
-      performZoomFrontTransition(oldImage: oldImage, on: imageLayer, in: rect)
+      performZoomFrontTransition(
+        oldImage: oldImage, showing: oldContentsRect, on: host, in: rect)
     case .pixelate:
-      performPixelateTransition(oldImage: oldImage, on: imageLayer, in: rect)
+      performPixelateTransition(
+        oldImage: oldImage, showing: oldContentsRect, on: host, in: rect)
     case .spiral:
-      performSpiralTransition(oldImage: oldImage, on: imageLayer, in: rect)
+      performSpiralTransition(
+        oldImage: oldImage, showing: oldContentsRect, on: host, in: rect)
     case .flip, .bend, .curl, .book:
       break  // Handled via CATransition in updateNSView
     }
   }
 
-  /// Remove all sublayers with a given name from the image layer.
+  /// The part of `contentsRect` shown by the tile at `col`, `row` of a grid.
+  private func tileContentsRect(
+    col: Int, row: Int, cols: Int, rows: Int, in contentsRect: CGRect
+  ) -> CGRect {
+    CGRect(
+      x: contentsRect.minX + contentsRect.width * CGFloat(col) / CGFloat(cols),
+      y: contentsRect.minY + contentsRect.height * CGFloat(row) / CGFloat(rows),
+      width: contentsRect.width / CGFloat(cols),
+      height: contentsRect.height / CGFloat(rows)
+    )
+  }
+
+  /// Remove all sublayers with a given name from the host layer.
   private func removeTransitionSublayers(named name: String, from layer: CALayer) {
     guard let sublayers = layer.sublayers else { return }
     for sub in sublayers where sub.name == name {
@@ -41,9 +61,9 @@ extension SlideshowImageView {
   /// Overlay a grid of tiles showing the old image, then fade each tile out
   /// with staggered random delays to reveal the new image underneath.
   func performBlocksTransition(
-    oldImage: Any?, on imageLayer: CALayer, in rect: CGRect
+    oldImage: Any?, showing oldContentsRect: CGRect, on host: CALayer, in rect: CGRect
   ) {
-    removeTransitionSublayers(named: "blockTile", from: imageLayer)
+    removeTransitionSublayers(named: "blockTile", from: host)
     guard let cgImage = oldImage else { return }
 
     let edge = DesignSystem.blocksEdge
@@ -62,21 +82,17 @@ extension SlideshowImageView {
         let tile = CALayer()
         tile.name = "blockTile"
         tile.frame = CGRect(
-          x: CGFloat(col) * tileW,
-          y: CGFloat(row) * tileH,
+          x: rect.minX + CGFloat(col) * tileW,
+          y: rect.minY + CGFloat(row) * tileH,
           width: tileW,
           height: tileH
         )
         tile.contents = cgImage
         tile.contentsGravity = .resizeAspect
-        tile.contentsRect = CGRect(
-          x: CGFloat(col) / CGFloat(cols),
-          y: CGFloat(row) / CGFloat(rows),
-          width: 1.0 / CGFloat(cols),
-          height: 1.0 / CGFloat(rows)
-        )
+        tile.contentsRect = tileContentsRect(
+          col: col, row: row, cols: cols, rows: rows, in: oldContentsRect)
         tile.masksToBounds = true
-        imageLayer.addSublayer(tile)
+        host.addSublayer(tile)
 
         let delay = Double.random(in: 0...maxDelay)
         let fade = CABasicAnimation(keyPath: "opacity")
@@ -92,7 +108,7 @@ extension SlideshowImageView {
     }
 
     DispatchQueue.main.asyncAfter(deadline: .now() + totalDuration + 0.05) {
-      self.removeTransitionSublayers(named: "blockTile", from: imageLayer)
+      self.removeTransitionSublayers(named: "blockTile", from: host)
     }
   }
 
@@ -103,18 +119,19 @@ extension SlideshowImageView {
   /// Creates a snapshot layer of the old image, then applies a grouped animation:
   /// `transform.scale` (1.0 → 1.4) + `opacity` (1.0 → 0.0).
   func performZoomFrontTransition(
-    oldImage: Any?, on imageLayer: CALayer, in rect: CGRect
+    oldImage: Any?, showing oldContentsRect: CGRect, on host: CALayer, in rect: CGRect
   ) {
-    removeTransitionSublayers(named: "zoomSnapshot", from: imageLayer)
+    removeTransitionSublayers(named: "zoomSnapshot", from: host)
     guard let cgImage = oldImage else { return }
 
     let snapshot = CALayer()
     snapshot.name = "zoomSnapshot"
-    snapshot.frame = imageLayer.bounds
+    snapshot.frame = rect
     snapshot.contents = cgImage
+    snapshot.contentsRect = oldContentsRect
     snapshot.contentsGravity = .resizeAspect
     snapshot.masksToBounds = true
-    imageLayer.addSublayer(snapshot)
+    host.addSublayer(snapshot)
 
     // Scale up toward the viewer
     let scale = CABasicAnimation(keyPath: "transform.scale")
@@ -135,7 +152,7 @@ extension SlideshowImageView {
     snapshot.add(group, forKey: "zoomFront")
 
     DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) {
-      self.removeTransitionSublayers(named: "zoomSnapshot", from: imageLayer)
+      self.removeTransitionSublayers(named: "zoomSnapshot", from: host)
     }
   }
 
@@ -147,18 +164,19 @@ extension SlideshowImageView {
   /// pixel scale animates from 1 → 40. Phase 2 (last 60%): opacity fades out.
   /// Falls back to a simple fade if CIFilter is unavailable.
   func performPixelateTransition(
-    oldImage: Any?, on imageLayer: CALayer, in rect: CGRect
+    oldImage: Any?, showing oldContentsRect: CGRect, on host: CALayer, in rect: CGRect
   ) {
-    removeTransitionSublayers(named: "pixelSnapshot", from: imageLayer)
+    removeTransitionSublayers(named: "pixelSnapshot", from: host)
     guard let cgImage = oldImage else { return }
 
     let snapshot = CALayer()
     snapshot.name = "pixelSnapshot"
-    snapshot.frame = imageLayer.bounds
+    snapshot.frame = rect
     snapshot.contents = cgImage
+    snapshot.contentsRect = oldContentsRect
     snapshot.contentsGravity = .resizeAspect
     snapshot.masksToBounds = true
-    imageLayer.addSublayer(snapshot)
+    host.addSublayer(snapshot)
 
     // Apply CIPixellate filter
     if let pixellateFilter = CIFilter(name: "CIPixellate") {
@@ -205,7 +223,7 @@ extension SlideshowImageView {
     }
 
     DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) {
-      self.removeTransitionSublayers(named: "pixelSnapshot", from: imageLayer)
+      self.removeTransitionSublayers(named: "pixelSnapshot", from: host)
     }
   }
 
@@ -216,9 +234,9 @@ extension SlideshowImageView {
   /// Same grid structure as blocks, but tile fade-out delays follow a spiral
   /// traversal pattern instead of random ordering.
   func performSpiralTransition(
-    oldImage: Any?, on imageLayer: CALayer, in rect: CGRect
+    oldImage: Any?, showing oldContentsRect: CGRect, on host: CALayer, in rect: CGRect
   ) {
-    removeTransitionSublayers(named: "spiralTile", from: imageLayer)
+    removeTransitionSublayers(named: "spiralTile", from: host)
     guard let cgImage = oldImage else { return }
 
     let edge = DesignSystem.blocksEdge
@@ -239,21 +257,17 @@ extension SlideshowImageView {
       let tile = CALayer()
       tile.name = "spiralTile"
       tile.frame = CGRect(
-        x: CGFloat(pos.col) * tileW,
-        y: CGFloat(pos.row) * tileH,
+        x: rect.minX + CGFloat(pos.col) * tileW,
+        y: rect.minY + CGFloat(pos.row) * tileH,
         width: tileW,
         height: tileH
       )
       tile.contents = cgImage
       tile.contentsGravity = .resizeAspect
-      tile.contentsRect = CGRect(
-        x: CGFloat(pos.col) / CGFloat(cols),
-        y: CGFloat(pos.row) / CGFloat(rows),
-        width: 1.0 / CGFloat(cols),
-        height: 1.0 / CGFloat(rows)
-      )
+      tile.contentsRect = tileContentsRect(
+        col: pos.col, row: pos.row, cols: cols, rows: rows, in: oldContentsRect)
       tile.masksToBounds = true
-      imageLayer.addSublayer(tile)
+      host.addSublayer(tile)
 
       let delay: Double
       if totalTiles > 1 {
@@ -273,7 +287,7 @@ extension SlideshowImageView {
     }
 
     DispatchQueue.main.asyncAfter(deadline: .now() + totalDuration + 0.05) {
-      self.removeTransitionSublayers(named: "spiralTile", from: imageLayer)
+      self.removeTransitionSublayers(named: "spiralTile", from: host)
     }
   }
 

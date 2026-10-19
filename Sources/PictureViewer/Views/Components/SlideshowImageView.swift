@@ -16,6 +16,11 @@ struct SlideshowImageView: NSViewRepresentable {
   /// Length of the transition — shorter in speedy mode.
   let duration: TimeInterval
   let isForward: Bool
+  /// Where the unzoomed picture goes, in this view's SwiftUI coordinates.
+  let pageFrame: CGRect
+  let zoom: SlideshowZoom
+  /// Where the next picture starts if the slideshow is zoomed in.
+  let zoomedStart: ZoomedPictureStart
   @Binding var isAnimating: Bool
 
   func makeNSView(context: Context) -> SlideshowContainerView {
@@ -30,26 +35,35 @@ struct SlideshowImageView: NSViewRepresentable {
 
     // Pastel shadow — soft warm tone matching the sketchbook aesthetic
     imageLayer.shadowColor = NSColor(red: 0.72, green: 0.66, blue: 0.58, alpha: 1.0).cgColor
-    imageLayer.shadowOpacity = 0.5
+    imageLayer.shadowOpacity = SlideshowContainerView.imageShadowOpacity
     imageLayer.shadowOffset = CGSize(width: 0, height: -6)
     imageLayer.shadowRadius = 16
 
-    container.layer?.addSublayer(imageLayer)
+    // Clips a zoomed picture to the view; transitions run on it while zoomed.
+    let viewportLayer = CALayer()
+    viewportLayer.name = "viewportLayer"
+    viewportLayer.masksToBounds = true
+    viewportLayer.addSublayer(imageLayer)
+
+    container.layer?.addSublayer(viewportLayer)
+    zoom.attach(container)
 
     return container
   }
 
   func updateNSView(_ nsView: SlideshowContainerView, context: Context) {
-    guard let rootLayer = nsView.layer,
-      let imageLayer = rootLayer.sublayers?.first(where: { $0.name == "imageLayer" })
-    else { return }
+    nsView.pageFrame = pageFrame
+
+    guard let imageLayer = nsView.imageLayer, let viewportLayer = nsView.viewportLayer else {
+      return
+    }
 
     guard let newImage = image else {
       CATransaction.begin()
       CATransaction.setDisableActions(true)
       nsView.displayedImage = nil
       nsView.currentImageSize = .zero
-      imageLayer.frame = rootLayer.bounds
+      imageLayer.frame = nsView.bounds
       imageLayer.contents = nil
       CATransaction.commit()
       return
@@ -60,8 +74,23 @@ struct SlideshowImageView: NSViewRepresentable {
     guard newImage !== nsView.displayedImage else { return }
     nsView.displayedImage = newImage
 
+    // Where the old picture showed, for transitions while zoomed.
+    let oldVisibleRect = nsView.visibleImageRect
+    let oldContentsRect = nsView.visibleContentsRect
+
+    // One transaction, so the new layout, picture and transition land together.
+    CATransaction.begin()
+    defer { CATransaction.commit() }
+
     // Store image size so layout() can recalculate on container resize
     nsView.currentImageSize = newImage.size
+    let newCGImage = newImage.asCGImage
+    nsView.imagePixelSize = newCGImage.map { CGSize(width: $0.width, height: $0.height) } ?? .zero
+    // Keeps the zoom; a picture switched to while zoomed starts in reading order.
+    nsView.showNewPicture(startingAt: zoomedStart)
+    // A zoomed picture layer can be far bigger than the screen, so transitions
+    // play on the viewport, over what's visible, instead.
+    let isZoomed = nsView.scale > 1
 
     // Only animate if there was a previous image (not first load)
     let hadPreviousImage = imageLayer.contents != nil
@@ -70,16 +99,20 @@ struct SlideshowImageView: NSViewRepresentable {
     case (.blocks, true), (.zoomFront, true), (.pixelate, true), (.spiral, true):
       // Custom transitions — snapshot old image, set new, then animate overlay
       let oldCGImage = imageLayer.contents
-      let fittedRect = nsView.fittedImageRect
 
       CATransaction.begin()
       CATransaction.setDisableActions(true)
-      imageLayer.frame = fittedRect
-      imageLayer.contents = newImage.asCGImage
+      imageLayer.contents = newCGImage
       CATransaction.commit()
 
-      dispatchCustomTransition(
-        oldImage: oldCGImage, on: imageLayer, in: fittedRect)
+      if isZoomed {
+        dispatchCustomTransition(
+          oldImage: oldCGImage, showing: oldContentsRect, on: viewportLayer, in: oldVisibleRect)
+      } else {
+        dispatchCustomTransition(
+          oldImage: oldCGImage, showing: CGRect(x: 0, y: 0, width: 1, height: 1),
+          on: imageLayer, in: imageLayer.bounds)
+      }
 
     case (.flip, true), (.bend, true), (.curl, true), (.book, true):
       // CATransition-based transitions
@@ -89,21 +122,12 @@ struct SlideshowImageView: NSViewRepresentable {
       transition.type = caTransitionType
       transition.subtype = caTransitionSubtype
       transition.isRemovedOnCompletion = true
-      imageLayer.add(transition, forKey: "slideTransition")
-
-      CATransaction.begin()
-      CATransaction.setDisableActions(true)
-      imageLayer.frame = nsView.fittedImageRect
-      CATransaction.commit()
-      imageLayer.contents = newImage.asCGImage
+      (isZoomed ? viewportLayer : imageLayer).add(transition, forKey: "slideTransition")
+      imageLayer.contents = newCGImage
 
     default:
       // First load — no animation, just set the image
-      CATransaction.begin()
-      CATransaction.setDisableActions(true)
-      imageLayer.frame = nsView.fittedImageRect
-      CATransaction.commit()
-      imageLayer.contents = newImage.asCGImage
+      imageLayer.contents = newCGImage
     }
   }
 
@@ -148,52 +172,6 @@ struct SlideshowImageView: NSViewRepresentable {
       return isForward ? .fromRight : .fromLeft
     case .flip, .bend, .curl, .blocks, .zoomFront, .pixelate, .spiral:
       return .fromRight
-    }
-  }
-}
-
-// MARK: - Container view with aspect-fit layout
-
-/// Custom container that keeps the image layer sized to the aspect-fitted rect.
-///
-/// On window resize, `layout()` recalculates the fitted rect so the image layer
-/// (and its curl/flip transitions) always matches the visible image bounds.
-class SlideshowContainerView: NSView {
-  var currentImageSize: CGSize = .zero
-  /// The image on screen, so updates that don't change it skip the transition.
-  var displayedImage: NSImage?
-
-  override func layout() {
-    super.layout()
-    guard let imageLayer = layer?.sublayers?.first(where: { $0.name == "imageLayer" })
-    else { return }
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    imageLayer.frame = fittedImageRect
-    CATransaction.commit()
-  }
-
-  /// The aspect-fitted rect for the current image within this view's bounds.
-  var fittedImageRect: CGRect {
-    guard currentImageSize.width > 0, currentImageSize.height > 0,
-      bounds.width > 0, bounds.height > 0
-    else { return bounds }
-
-    let imageAspect = currentImageSize.width / currentImageSize.height
-    let containerAspect = bounds.width / bounds.height
-
-    if imageAspect > containerAspect {
-      // Wider image — letterboxed top/bottom
-      let width = bounds.width
-      let height = width / imageAspect
-      let originY = (bounds.height - height) / 2
-      return CGRect(x: 0, y: originY, width: width, height: height)
-    } else {
-      // Taller image — pillarboxed left/right
-      let height = bounds.height
-      let width = height * imageAspect
-      let originX = (bounds.width - width) / 2
-      return CGRect(x: originX, y: 0, width: width, height: height)
     }
   }
 }

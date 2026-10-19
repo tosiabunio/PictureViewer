@@ -32,7 +32,7 @@ The Swift rewrite uses **Core Animation** (`CATransition` with `pageCurl`, `oglF
 
 - **Reads** pictures from the user's Pictures folder on macOS, or another folder chosen via File ▸ Open Folder… (persisted in UserDefaults)
 - **Displays** images in a pastel-toned, sketchbook-style gallery
-- **Provides** a fullscreen slideshow with flip, bend, and curl page-turn transitions
+- **Provides** a fullscreen slideshow with flip, bend, and curl page-turn transitions, plus zoom and pan
 - **Uses** SF Symbols for UI controls
 - **Built** with Swift 5.9+, SwiftUI, Core Animation, and Swift Package Manager
 
