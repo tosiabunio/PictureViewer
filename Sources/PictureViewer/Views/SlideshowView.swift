@@ -44,6 +44,10 @@ struct SlideshowView: View {
   /// `onKeyPress` only fires for a focused view, so the slideshow takes focus on appear.
   @FocusState private var isFocused: Bool
 
+  /// Trashing asks first; auto-play pauses meanwhile so the picture can't change under the prompt.
+  @State private var isConfirmingTrash = false
+  @State private var resumesPlayAfterTrashPrompt = false
+
   var body: some View {
     ZStack {
       // Glow background
@@ -101,6 +105,18 @@ struct SlideshowView: View {
     // Pinching or double-clicking the picture switches to zoom mode by itself.
     .onChange(of: zoom.isZoomed) { _, isZoomed in
       if isZoomed { enterZoomMode() }
+    }
+    .alert("Move “\(currentFilename)” to the Trash?", isPresented: $isConfirmingTrash) {
+      Button("Move to Trash", role: .destructive) {
+        deleteCurrentImage()
+        finishTrashPrompt()
+      }
+      .keyboardShortcut(.defaultAction)
+      Button("Cancel", role: .cancel) {
+        finishTrashPrompt()
+      }
+    } message: {
+      Text("You can restore it from the Trash until you empty it.")
     }
     .focusable()
     .focusEffectDisabled()
@@ -277,7 +293,7 @@ struct SlideshowView: View {
       onZoomIn: { zoom.zoomIn() },
       onZoomOut: { zoom.zoomOut() },
       onFit: { zoom.fit() },
-      onDelete: deleteCurrentImage
+      onDelete: requestTrash
     )
   }
 
@@ -488,6 +504,22 @@ extension SlideshowView {
   }
 
   // MARK: Delete
+
+  private func requestTrash() {
+    guard !isAnimating, !imageStore.images.isEmpty else { return }
+    resumesPlayAfterTrashPrompt = isPlaying
+    stopAutoPlay()
+    isConfirmingTrash = true
+  }
+
+  /// Resumes auto-play if the prompt paused it, and takes keyboard focus back from the alert.
+  private func finishTrashPrompt() {
+    if resumesPlayAfterTrashPrompt, !imageStore.images.isEmpty {
+      startAutoPlay()
+    }
+    resumesPlayAfterTrashPrompt = false
+    isFocused = true
+  }
 
   /// Move the current image to Trash via FileManager and advance to the next slide.
   private func deleteCurrentImage() {
