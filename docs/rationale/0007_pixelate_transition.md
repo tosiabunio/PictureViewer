@@ -21,11 +21,12 @@ Pixelate is the only transition that uses a Core Image filter (`CIPixellate`) ap
 ```swift
 let snapshot = CALayer()
 snapshot.name = "pixelSnapshot"
-snapshot.frame = imageLayer.bounds
+snapshot.frame = rect
 snapshot.contents = cgImage
+snapshot.contentsRect = oldContentsRect
 snapshot.contentsGravity = .resizeAspect
 snapshot.masksToBounds = true
-imageLayer.addSublayer(snapshot)
+host.addSublayer(snapshot)
 
 if let pixellateFilter = CIFilter(name: "CIPixellate") {
     pixellateFilter.setDefaults()
@@ -34,6 +35,8 @@ if let pixellateFilter = CIFilter(name: "CIPixellate") {
     // ...
 }
 ```
+
+As with zoom front, `host`, `rect` and `oldContentsRect` are the picture layer and the whole old image when unzoomed, or the viewport layer and the part of the old picture that was on screen while zoomed in ([0010](0010_slideshow_zoom_and_pan.md)).
 
 Setting `inputScale` to 1.0 initially means no visible pixelation — the image looks normal. The animation then drives `inputScale` from 1 to 40, where 40 means each output pixel covers a 40x40 block of source pixels.
 
@@ -110,6 +113,5 @@ This maintains the contract that a transition always occurs — the user never s
 
 ## File References
 
-- Filter setup + two-phase animation: `SlideshowTransitions.swift:139-192`
-- Duration constants: `DesignSystem.swift:122, 131`
-- Fallback fade: `SlideshowTransitions.swift:183-190`
+- Filter setup, two-phase animation and fallback fade: `performPixelateTransition` in `SlideshowTransitions.swift`
+- Duration constants: `pixelateDuration`, `speedyPixelateDuration` in `DesignSystem.swift`

@@ -18,9 +18,9 @@ Curl uses `pageUnCurl`, the complementary counterpart to `pageCurl`. The same GP
 let transition = CATransition()
 transition.type = CATransitionType(rawValue: "pageUnCurl")
 transition.subtype = .fromRight
-transition.duration = DesignSystem.curlDuration  // 1.1s
+transition.duration = duration  // 1.1s, or 0.55s in speedy mode
 transition.timingFunction = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.25, 1.0)
-imageLayer.add(transition, forKey: "slideTransition")
+(isZoomed ? viewportLayer : imageLayer).add(transition, forKey: "slideTransition")
 ```
 
 ### Relationship to `pageCurl`
@@ -43,6 +43,6 @@ Like bend, curl always operates from the right. The directional pair (curl vs un
 
 ## File References
 
-- Transition type selection: `SlideshowImageView.swift:132`
-- Duration constant: `DesignSystem.swift:111`
-- Contrast with book: `SlideshowImageView.swift:134-136`
+- Transition type selection: `caTransitionType` in `SlideshowImageView.swift`
+- Duration constants: `curlDuration`, `speedyCurlDuration` in `DesignSystem.swift`
+- Contrast with book: the `.book` cases of `caTransitionType` and `caTransitionSubtype` in `SlideshowImageView.swift`

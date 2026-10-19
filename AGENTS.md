@@ -32,13 +32,13 @@ The Swift rewrite uses **Core Animation** (`CATransition` with `pageCurl`, `oglF
 
 - **Reads** pictures from the user's Pictures folder on macOS, or another folder chosen via File ▸ Open Folder… (persisted in UserDefaults)
 - **Displays** images in a pastel-toned, sketchbook-style gallery
-- **Provides** a fullscreen slideshow with flip, bend, and curl page-turn transitions, plus zoom and pan
-- **Uses** SF Symbols for UI controls
+- **Provides** a fullscreen slideshow with eight transitions (flip, bend, curl, book, blocks, zoom front, pixelate, spiral), cycled or one chosen, plus zoom and pan
+- **Uses** custom line-only icons (`LineIcons.swift`, ported from the Tauri version) for UI controls
 - **Built** with Swift 5.9+, SwiftUI, Core Animation, and Swift Package Manager
 
 **Runtime requirements:**
 - macOS 14+ (Sonoma)
-- Pictures folder in standard location
+- Pictures folder in its standard location (the default; any other folder can be chosen)
 
 # ARCHITECTURE
 
@@ -48,17 +48,25 @@ PictureViewer/
 ├── Sources/PictureViewer/
 │   ├── PictureViewerApp.swift              # @main App entry point
 │   ├── Models/
-│   │   └── ImageItem.swift                 # Image model + SlideAnimationType enum
+│   │   └── ImageItem.swift                 # Image model, sort order, transition types + choice
 │   ├── Services/
 │   │   └── ImageStore.swift                # Folder scanner (Pictures by default) + thumbnail cache
 │   ├── Views/
 │   │   ├── ContentView.swift               # Root view (gallery + slideshow overlay)
 │   │   ├── GalleryView.swift               # LazyVGrid thumbnail gallery
-│   │   ├── SlideshowView.swift             # Fullscreen slideshow + Core Animation
-│   │   └── Components/
-│   │       └── HeaderView.swift            # Top bar with title + play button
+│   │   ├── SlideshowView.swift             # Fullscreen slideshow: navigation, auto-play, zoom mode
+│   │   ├── Components/
+│   │   │   ├── HeaderView.swift            # Top bar: title, sort menu, folder button, play button
+│   │   │   ├── SlideshowImageView.swift    # NSViewRepresentable: CATransition page turns
+│   │   │   ├── SlideshowContainerView.swift # Picture layer host: fit, zoom, pan, gestures
+│   │   │   ├── SlideshowTransitions.swift  # Custom transitions (blocks, zoom front, pixelate, spiral)
+│   │   │   ├── SlideshowControlBar.swift   # Slideshow controls (navigation or zoom mode)
+│   │   │   └── TransitionPicker.swift      # Transition menu: cycle or one effect
+│   │   └── Icons/
+│   │       └── LineIcons.swift             # Line-only icon shapes
 │   └── Theme/
 │       └── DesignSystem.swift              # Pastel color palette + typography + constants
+└── docs/rationale/                         # Why each transition, the tape strips, and zoom work as they do
 ```
 
 - **UI Layer**: SwiftUI views with `@State` / `@StateObject` / `@EnvironmentObject`
@@ -71,7 +79,7 @@ PictureViewer/
 - **Strict Concurrency**: Build with `StrictConcurrency` upcoming feature flag
 - **Error Handling**: Propagate errors via `throws`; display in UI with user-friendly messages
 - **Performance**: Generate thumbnails lazily; cache them in memory; scan filesystem on background queue
-- **Design Consistency**: Maintain sketchbook aesthetic with pastel tones and SF Symbols
+- **Design Consistency**: Maintain sketchbook aesthetic with pastel tones and line icons
 - **GPU Animations**: All page-turn transitions via Core Animation — never animate on main thread
 
 # COMMIT CONVENTIONS
@@ -106,8 +114,8 @@ Use colon (`:`) as a separator in task names:
 - Caption: Rounded system font at 12pt
 
 ## Icons
-- SF Symbols with regular weight
-- Consistent sizing via `.font(.system(size:))`
+- Line-only `Shape`s in `Views/Icons/LineIcons.swift`, drawn on a 24×24 grid with a 1.5pt round stroke
+- Consistent sizing via `.lineIconStyle(color:size:)` (or `.filledIconStyle` for play/pause)
 
 # SWIFT-SPECIFIC GUIDELINES
 
@@ -120,7 +128,7 @@ Use colon (`:`) as a separator in task names:
 - Use `FileManager.default.enumerator(at:)` for recursive directory traversal
 - Filter by image extensions: jpg, jpeg, png, gif, webp, bmp, tiff, tif, heic, heif
 - Scan on a background `DispatchQueue` via `withCheckedThrowingContinuation`
-- Read-only access — never modify the user's files
+- Read-only access — never modify the user's files; the one exception is the slideshow's trash button, which moves a picture to the Trash with `FileManager.trashItem` after the user confirms
 
 ## Concurrency
 - `@MainActor` on `ObservableObject` classes that publish to SwiftUI
@@ -130,7 +138,7 @@ Use colon (`:`) as a separator in task names:
 ## Core Animation Transitions
 - Use `CATransition` with types: `oglFlip`, `pageCurl`, `pageUnCurl`
 - Set `timingFunction` to custom cubic-bezier for natural page-turn feel
-- Apply transitions via `layer.add(_:forKey:)` on the image layer
+- Apply transitions via `layer.add(_:forKey:)` on the image layer — or on the viewport layer while zoomed (see `docs/rationale/0010_slideshow_zoom_and_pan.md`)
 - Wrap in `NSViewRepresentable` for SwiftUI integration
 
 ## SwiftUI Patterns
@@ -147,11 +155,11 @@ Use colon (`:`) as a separator in task names:
 - Is the UI responsive to window resizing?
 - Does the design match sketchbook aesthetic?
 - Are images loaded lazily with thumbnails cached?
-- Are file operations read-only?
+- Are file operations read-only (apart from the confirmed Move to Trash)?
 
 # OUT OF SCOPE / ANTI-PATTERNS
 
-- Modifying files in the Pictures folder (read-only)
+- Modifying the user's files (the only write is the slideshow's confirmed Move to Trash)
 - Network requests (fully local app)
 - UIKit (this is macOS only — use AppKit when needed via NSViewRepresentable)
 - Heavy image processing (use native NSImage/CGImage loading)

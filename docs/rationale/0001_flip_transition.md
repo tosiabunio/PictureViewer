@@ -18,9 +18,9 @@ Flip uses `oglFlip`, a private but long-stable `CATransitionType` that delegates
 let transition = CATransition()
 transition.type = CATransitionType(rawValue: "oglFlip")
 transition.subtype = .fromRight
-transition.duration = DesignSystem.flipDuration  // 1.0s
+transition.duration = duration  // 1.0s, or 0.5s in speedy mode
 transition.timingFunction = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.25, 1.0)
-imageLayer.add(transition, forKey: "slideTransition")
+(isZoomed ? viewportLayer : imageLayer).add(transition, forKey: "slideTransition")
 ```
 
 ### Why `oglFlip` instead of SwiftUI `.rotation3DEffect`
@@ -40,12 +40,16 @@ The transition always uses `.fromRight`, meaning the right edge lifts toward the
 
 Duration is 1.0s at normal speed, 0.5s in speedy mode. The ease curve `(0.25, 0.1, 0.25, 1.0)` is a slightly modified ease-out that starts with a gentle push and decelerates smoothly. This avoids the mechanical feel of linear timing while keeping the flip from feeling sluggish.
 
+`SlideshowView` picks the duration together with the effect each time it switches pictures (`transitionDuration(for:)`) and passes it to `SlideshowImageView`. Every transition, built-in or custom, uses that value, so the animation and the input lock that ignores navigation until the transition ends always agree. Toggling speedy mode, or picking another effect, applies from the next picture.
+
 ## Layer Sizing
 
 The transition is applied to `imageLayer`, which is sized to the aspect-fitted rect (`fittedImageRect`) rather than the full container bounds. This ensures the 3D flip rotation happens around the visible image's center — not the center of a larger invisible rectangle, which would make the image appear to orbit an off-center axis.
 
+While zoomed in, the picture layer can be several times the size of the screen. The transition then goes on the screen-sized `viewportLayer` that clips it, so the flip turns what is on screen rather than a huge, mostly invisible layer. See [0010](0010_slideshow_zoom_and_pan.md).
+
 ## File References
 
-- Transition type selection: `SlideshowImageView.swift:128`
-- Duration constant: `DesignSystem.swift:109`
-- Layer frame sizing: `SlideshowImageView.swift:86-89`
+- Transition type selection: `caTransitionType` in `SlideshowImageView.swift`
+- Duration constants: `flipDuration`, `speedyFlipDuration` in `DesignSystem.swift`; picked per slide by `transitionDuration(for:)` in `SlideshowView.swift`
+- Layer frame sizing: `fittedImageRect` in `SlideshowContainerView.swift`

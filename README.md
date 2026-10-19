@@ -2,7 +2,7 @@
 
 A native macOS application for browsing pictures in a sketchbook-style interface with GPU-composited page-turn animations.
 
-Built with Swift, SwiftUI, and Core Animation. Reads images from the user's Pictures folder — or any folder you choose — and displays them in a pastel-toned gallery with a fullscreen slideshow featuring eight transition effects — all rendered on the compositor thread with zero jank.
+Built with Swift, SwiftUI, and Core Animation. Reads images from the user's Pictures folder — or any folder you choose — and displays them in a pastel-toned gallery with a fullscreen slideshow: eight transition effects, all rendered on the compositor thread with zero jank, plus zoom and pan.
 
 ## Screenshots
 
@@ -17,6 +17,12 @@ The gallery starts in your Pictures folder. Click the folder button in the heade
 ## Sorting
 
 Use the sort menu in the header, or **View ▸ Sort By**, to order pictures by name (A–Z or Z–A) or by modification date (newest or oldest first). Names sort the way Finder does, so `page2` comes before `page10`, and pictures in subfolders stay grouped together. Pictures with the same modification date are ordered by name. The choice is remembered across launches.
+
+## Slideshow
+
+Click a thumbnail to open it in the slideshow, or click **Slideshow** in the header to play everything from the first picture.
+
+The control bar along the bottom has, from left to right: close, the file name, first, previous, play, stop, next, ⚡ speedy mode (a new picture every 2 seconds instead of 5, and transitions twice as fast), the transition picker, zoom mode, and trash. Trash asks before moving the picture to the Trash, where you can restore it until you empty it.
 
 ## Slideshow Keyboard Shortcuts
 
@@ -144,6 +150,10 @@ for (spiralIndex, pos) in order.enumerated() {
   fade.beginTime = CACurrentMediaTime() + delay
 }
 ```
+
+## Design Notes
+
+[`docs/rationale/`](docs/rationale/) explains the reasoning behind each transition effect, the tape-strip positioning, and slideshow zoom and pan.
 
 ## Requirements
 

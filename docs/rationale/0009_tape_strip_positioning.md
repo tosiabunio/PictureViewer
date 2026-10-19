@@ -43,6 +43,8 @@ The same problem occurs horizontally for the bottom-right tape on pillarboxed im
 
 The fix has two parts: (1) calculate how much the aspect-fitted image is inset from the container edges, and (2) apply those insets as offsets to the tape strip overlays.
 
+Here the "container" is the page area — the space between the slideshow's top bar and control bar, minus 60pt on each side.
+
 ### Part 1: `imageInsets(in:)`
 
 This function computes the empty space between the container edges and the rendered image edges:
@@ -81,14 +83,14 @@ The returned `EdgeInsets` tells you exactly how many points of empty space exist
 
 ### Part 2: GeometryReader + Offset
 
-The tape strips are SwiftUI overlays positioned using the computed insets:
+The tape strips are SwiftUI overlays on a clear placeholder that fills the page area, positioned using the computed insets:
 
 ```swift
-private var slideshowFrame: some View {
+private var pageArea: some View {
     GeometryReader { geo in
         let insets = imageInsets(in: geo.size)
 
-        SlideshowImageView(/* ... */)
+        Color.clear
             // Top tape — sits on the actual image top edge
             .overlay(alignment: .top) {
                 TapeStrip(color: slideshowTopTape)
@@ -106,16 +108,25 @@ private var slideshowFrame: some View {
                         y: -(insets.bottom - 10)
                     )
             }
+            .opacity(zoom.isZoomed ? 0 : 1)
+            .animation(.easeInOut(duration: 0.2), value: zoom.isZoomed)
+    }
+    .onGeometryChange(for: CGRect.self) { proxy in
+        proxy.frame(in: .named(Self.coordinateSpace))
+    } action: { frame in
+        pageFrame = frame
     }
     .padding(.horizontal, 60)
 }
 ```
 
+The picture itself isn't in here. `SlideshowImageView` spans the whole slideshow behind the bars, so that a zoomed-in picture can spread over all of it, and the page area tells it where the unzoomed picture goes: `onGeometryChange` reports the placeholder's frame in the slideshow's coordinate space, and the image view fits the picture into exactly that rect. While zoomed in, the picture no longer sits in the page, so the tape fades out and comes back when it returns to fit. See [0010](0010_slideshow_zoom_and_pan.md).
+
 ### Why GeometryReader Is Necessary
 
-`imageInsets(in:)` needs the container's pixel dimensions. SwiftUI's layout system doesn't expose parent size to child views without `GeometryReader`. The `SlideshowImageView` (an `NSViewRepresentable`) knows its own size internally (via `NSView.bounds`), but that information isn't available to the SwiftUI overlay modifiers.
+`imageInsets(in:)` needs the page area's dimensions. SwiftUI's layout system doesn't expose parent size to child views without `GeometryReader`, and the page area's size isn't fixed: the spacers around it in the slideshow's `VStack` share the leftover height with it.
 
-`GeometryReader` bridges this gap: it reports `geo.size` — the container's proposed size — which is exactly what we need to calculate aspect-fit insets.
+`GeometryReader` bridges this gap: it reports `geo.size` — the page area's proposed size — which is exactly what we need to calculate aspect-fit insets. The same measured area, as a frame, is what `SlideshowImageView` fits the picture into.
 
 ### Offset Math Explained
 
@@ -149,19 +160,16 @@ The alternative (caching insets and invalidating on size change) would add compl
 The `imageInsets(in:)` calculation in SwiftUI mirrors the `fittedImageRect` calculation in the `SlideshowContainerView` (AppKit/Core Animation layer):
 
 ```swift
-// SlideshowContainerView — used for CALayer frame
+// SlideshowContainerView — used for the CALayer frame
 var fittedImageRect: CGRect {
-    // Same aspect-fit logic, but returns a rect instead of insets
-    if imageAspect > containerAspect {
-        let width = bounds.width
-        let height = width / imageAspect
-        let originY = (bounds.height - height) / 2
-        return CGRect(x: 0, y: originY, width: width, height: height)
+    // Same aspect-fit logic within the page area, but returns a rect instead of insets
+    let page = pageRect  // pageFrame, converted to this view's bottom-left origin
+    if imageAspect > pageAspect {
+        let height = page.width / imageAspect
+        return CGRect(x: page.minX, y: page.midY - height / 2, width: page.width, height: height)
     } else {
-        let height = bounds.height
-        let width = height * imageAspect
-        let originX = (bounds.width - width) / 2
-        return CGRect(x: originX, y: 0, width: width, height: height)
+        let width = page.height * imageAspect
+        return CGRect(x: page.midX - width / 2, y: page.minY, width: width, height: page.height)
     }
 }
 ```
@@ -170,7 +178,7 @@ Both compute the same aspect-fit geometry, but for different consumers:
 - `fittedImageRect` → Core Animation layer frame (AppKit coordinates)
 - `imageInsets(in:)` → SwiftUI overlay offsets (SwiftUI coordinates)
 
-They must agree, otherwise the tape strips wouldn't align with the actual rendered image. Since both use the same formula (just returning different representations), they're guaranteed to produce consistent results.
+They must agree, otherwise the tape strips wouldn't align with the actual rendered image. Both use the same formula on the same rect — the page area that the `GeometryReader` measures and reports as `pageFrame` — so they produce consistent results. Because the image view uses AppKit's bottom-left origin, `pageRect` flips the reported frame vertically before fitting.
 
 ## Tape Color Cycling
 
@@ -197,8 +205,8 @@ The `+3` offset ensures the two tape strips on the same image are never the same
 
 ## File References
 
-- `imageInsets(in:)`: `SlideshowView.swift:135-155`
-- Tape overlay placement: `SlideshowView.swift:104-131`
-- Tape color cycling: `SlideshowView.swift:158-164`
-- Parallel AppKit calculation: `SlideshowImageView.swift:180-201`
-- Tape color palette: `DesignSystem.swift:89-96`
+- `imageInsets(in:)`: `SlideshowView.swift`
+- Tape overlay placement and page frame reporting: `pageArea` in `SlideshowView.swift`
+- Tape color cycling: `slideshowTopTape`, `slideshowBottomTape` in `SlideshowView.swift`
+- Parallel AppKit calculation: `fittedImageRect`, `pageRect` in `SlideshowContainerView.swift`
+- Tape color palette: `tapeColors` in `DesignSystem.swift`

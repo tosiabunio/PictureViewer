@@ -18,9 +18,9 @@ Bend uses `pageCurl`, another private-but-stable `CATransitionType`. Like `oglFl
 let transition = CATransition()
 transition.type = CATransitionType(rawValue: "pageCurl")
 transition.subtype = .fromRight
-transition.duration = DesignSystem.bendDuration  // 1.2s
+transition.duration = duration  // 1.2s, or 0.6s in speedy mode
 transition.timingFunction = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.25, 1.0)
-imageLayer.add(transition, forKey: "slideTransition")
+(isZoomed ? viewportLayer : imageLayer).add(transition, forKey: "slideTransition")
 ```
 
 ### Why `pageCurl` Runs on the GPU
@@ -43,8 +43,10 @@ Bend always curls from the right (`.fromRight`), regardless of navigation direct
 
 Same as flip — the transition is applied to the aspect-fitted `imageLayer`, so the curl originates from the visible image's corner rather than the container's corner. Without this, a tall portrait image in a wide container would have its curl start from empty space to the right of the image, breaking the illusion.
 
+While zoomed in, it goes on the screen-sized `viewportLayer` instead, so the curl starts from the corner of the screen and peels away what you were looking at. See [0010](0010_slideshow_zoom_and_pan.md).
+
 ## File References
 
-- Transition type selection: `SlideshowImageView.swift:130`
-- Duration constant: `DesignSystem.swift:110`
-- Aspect-fit sizing: `SlideshowContainerView.fittedImageRect` in `SlideshowImageView.swift:180-201`
+- Transition type selection: `caTransitionType` in `SlideshowImageView.swift`
+- Duration constants: `bendDuration`, `speedyBendDuration` in `DesignSystem.swift`
+- Aspect-fit sizing: `fittedImageRect` in `SlideshowContainerView.swift`

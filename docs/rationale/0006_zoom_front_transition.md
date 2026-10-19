@@ -21,14 +21,15 @@ Zoom front uses a snapshot `CALayer` with a `CAAnimationGroup` combining scale a
 ```swift
 let snapshot = CALayer()
 snapshot.name = "zoomSnapshot"
-snapshot.frame = imageLayer.bounds
+snapshot.frame = rect
 snapshot.contents = cgImage           // Old image
+snapshot.contentsRect = oldContentsRect
 snapshot.contentsGravity = .resizeAspect
 snapshot.masksToBounds = true
-imageLayer.addSublayer(snapshot)
+host.addSublayer(snapshot)
 ```
 
-The snapshot is placed on top of `imageLayer` (which already has the new image). As the snapshot scales up and fades, the static new image is progressively revealed.
+The snapshot is placed over the new image: on `imageLayer` itself (covering its bounds, showing the whole old image) when unzoomed, or on the screen-sized viewport layer (covering the part of the old picture that was on screen, cropped to it) while zoomed in. As the snapshot scales up and fades, the static new image is progressively revealed. See [0010](0010_slideshow_zoom_and_pan.md).
 
 `masksToBounds = true` is essential — without it, the scaling snapshot would visually overflow the image area, overlapping tape strips and other UI elements. Clipping ensures the zoom effect stays contained within the image bounds.
 
@@ -45,7 +46,7 @@ fade.toValue = 0.0
 
 let group = CAAnimationGroup()
 group.animations = [scale, fade]
-group.duration = 0.8  // DesignSystem.zoomFrontDuration
+group.duration = duration  // 0.8s, or 0.4s in speedy mode
 group.timingFunction = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.25, 1.0)
 ```
 
@@ -74,6 +75,6 @@ Same pattern as blocks — `DispatchQueue.main.asyncAfter` removes the snapshot 
 
 ## File References
 
-- Snapshot + animation: `SlideshowTransitions.swift:100-132`
-- Duration constants: `DesignSystem.swift:120, 130`
-- Dispatch routing: `SlideshowTransitions.swift:21`
+- Snapshot + animation: `performZoomFrontTransition` in `SlideshowTransitions.swift`
+- Duration constants: `zoomFrontDuration`, `speedyZoomFrontDuration` in `DesignSystem.swift`
+- Dispatch routing: `dispatchCustomTransition` in `SlideshowTransitions.swift`

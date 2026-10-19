@@ -31,7 +31,7 @@ let tileW = rect.width / CGFloat(cols)
 let tileH = rect.height / CGFloat(rows)
 ```
 
-Tiles are constructed identically to blocks — same `contentsRect` slicing, same `masksToBounds`, same `contentsGravity`. The only difference is when each tile starts its fade.
+Tiles are constructed identically to blocks — same `contentsRect` slicing (including the crop to the visible part while zoomed in), same `masksToBounds`, same `contentsGravity`. The only difference is when each tile starts its fade.
 
 ### Spiral Order Algorithm
 
@@ -105,7 +105,7 @@ This linear mapping means tiles fade at a constant rate around the spiral. An al
 
 1.4s normal, 0.7s speedy. Spiral is the longest transition because the eye needs time to track the pattern. If the spiral completed in 0.8s, the viewer would see tiles disappearing but wouldn't have time to perceive the spiral order — it would look like a slightly-less-random version of blocks, defeating the purpose.
 
-The per-tile fade duration is the same as blocks (`blocksBlockFade = 0.35s`). This means `maxDelay = 1.4 - 0.35 = 1.05s`, giving the outermost tile a full second head start over the innermost tile. That's enough temporal spread for the spiral pattern to be clearly visible.
+The per-tile fade starts from the same `blocksBlockFade` (0.35s) as blocks and scales with the duration, so at normal speed `maxDelay = 1.4 - 0.35 = 1.05s`, giving the outermost tile a full second head start over the innermost tile. That's enough temporal spread for the spiral pattern to be clearly visible. In speedy mode (0.7s) the fade shrinks to 0.175s and the spread to 0.525s, keeping the same proportions.
 
 ### Why Clockwise, Outside-In
 
@@ -130,7 +130,7 @@ Both methods live in `SlideshowTransitions.swift` as separate functions rather t
 
 ## File References
 
-- Spiral transition: `SlideshowTransitions.swift:200-280`
-- Spiral order algorithm: `SlideshowTransitions.swift:285-330`
-- Duration constants: `DesignSystem.swift:123, 132`
-- Shared tile edge size: `DesignSystem.swift:119`
+- Spiral transition: `performSpiralTransition` in `SlideshowTransitions.swift`
+- Spiral order algorithm: `spiralOrder(rows:cols:)` in `SlideshowTransitions.swift`
+- Duration constants: `spiralDuration`, `speedySpiralDuration` in `DesignSystem.swift`
+- Shared tile edge size: `blocksEdge` in `DesignSystem.swift`

@@ -78,9 +78,11 @@ private func navigatePrev() {
 
 This is passed through to `SlideshowImageView` as a property. The flag is only consumed by the `book` case — all other transitions ignore it. This means adding direction-awareness to another transition in the future only requires reading the existing `isForward` property; no plumbing changes needed.
 
+The same navigation functions also set `zoomedStart`, which decides where a picture switched to while zoomed in begins (top-left going forward, bottom-right going back). It is kept separate from `isForward` because Home counts as backward for the page turn but still starts the first picture at its top. See [0010](0010_slideshow_zoom_and_pan.md).
+
 ## File References
 
-- Type/subtype selection: `SlideshowImageView.swift:134-136, 148`
-- Timing function: `SlideshowImageView.swift:119`
-- Duration constant: `DesignSystem.swift:113`
-- Forward/backward state: `SlideshowView.swift:244, 253`
+- Type/subtype selection: `caTransitionType`, `caTransitionSubtype` in `SlideshowImageView.swift`
+- Timing function: `timingFunction` in `SlideshowImageView.swift`
+- Duration constants: `bookDuration`, `speedyBookDuration` in `DesignSystem.swift`
+- Forward/backward state: `navigateNext()`, `navigatePrev()` in `SlideshowView.swift`
