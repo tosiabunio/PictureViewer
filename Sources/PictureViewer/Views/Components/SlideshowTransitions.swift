@@ -254,18 +254,20 @@ extension SlideshowImageView {
     let totalTiles = order.count
 
     for (spiralIndex, pos) in order.enumerated() {
+      // The spiral counts rows from the top, but layer y grows upward.
+      let row = rows - 1 - pos.row
       let tile = CALayer()
       tile.name = "spiralTile"
       tile.frame = CGRect(
         x: rect.minX + CGFloat(pos.col) * tileW,
-        y: rect.minY + CGFloat(pos.row) * tileH,
+        y: rect.minY + CGFloat(row) * tileH,
         width: tileW,
         height: tileH
       )
       tile.contents = cgImage
       tile.contentsGravity = .resizeAspect
       tile.contentsRect = tileContentsRect(
-        col: pos.col, row: pos.row, cols: cols, rows: rows, in: oldContentsRect)
+        col: pos.col, row: row, cols: cols, rows: rows, in: oldContentsRect)
       tile.masksToBounds = true
       host.addSublayer(tile)
 

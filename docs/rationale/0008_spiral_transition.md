@@ -81,6 +81,8 @@ This is the standard spiral matrix traversal algorithm. For a 4x5 grid, it produ
 
 The boundary variables (`top`, `bottom`, `left`, `right`) shrink inward after each pass, ensuring every cell is visited exactly once. The `if` guards prevent double-visiting cells when the remaining area is a single row or column.
 
+The grid's rows count from the top, but Core Animation layer coordinates on macOS grow upward, so each tile is placed — and cropped — at row `rows - 1 - row`. Without that flip, the spiral would start at the bottom-left and run counter-clockwise on screen.
+
 ### Delay Mapping
 
 Each tile's fade delay is proportional to its position in the spiral:
