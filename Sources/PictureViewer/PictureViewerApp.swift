@@ -49,6 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     registerBundledFonts()
     registerAppIcon()
 
+    // SwiftUI usually creates and keys the window before this runs, so its
+    // didBecomeKey notification has already fired by the time we observe.
+    if let window = NSApp.keyWindow {
+      enterFullScreenOnce(window)
+    }
+
     NotificationCenter.default.addObserver(
       self,
       selector: #selector(windowDidBecomeKey),
@@ -58,7 +64,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   @objc @MainActor private func windowDidBecomeKey(_ notification: Notification) {
-    guard !didEnterFullScreen, let window = notification.object as? NSWindow else { return }
+    guard let window = notification.object as? NSWindow else { return }
+    enterFullScreenOnce(window)
+  }
+
+  /// Enters full screen the first time a gallery window becomes key.
+  ///
+  /// Panels such as the folder picker are skipped: full-screening one moves it
+  /// into its own Space, which is left empty (black) once the panel closes.
+  @MainActor private func enterFullScreenOnce(_ window: NSWindow) {
+    guard !didEnterFullScreen, !(window is NSPanel) else { return }
     didEnterFullScreen = true
     // Ensure the window supports full screen, then enter after a short layout delay.
     window.collectionBehavior.insert(.fullScreenPrimary)
