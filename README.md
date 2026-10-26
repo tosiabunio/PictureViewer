@@ -159,7 +159,7 @@ for (spiralIndex, pos) in order.enumerated() {
 
 - macOS 14+ (Sonoma)
 - Swift 5.9+
-- [Task](https://taskfile.dev) (optional, for `task dev:run` commands)
+- [Task](https://taskfile.dev) (optional, for `task dev:run` and `task install`)
 
 ## Build & Run
 
@@ -169,6 +169,9 @@ swift build
 
 # Run as .app bundle (requires task runner)
 task dev:run
+
+# Install a release build into /Applications (or INSTALL_DIR=~/Applications)
+task install
 ```
 
 ## License

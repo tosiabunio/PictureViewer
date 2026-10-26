@@ -73,6 +73,20 @@ tasks:
       - cp Resources/Icons/icon.icns "{{.APP}}/Contents/Resources/icon.icns"
       - cp -R ".build/{{.CONFIG}}/PictureViewer_PictureViewer.bundle" "{{.APP}}/Contents/Resources/"
 
+  install:
+    desc: Build release .app bundle and install it into /Applications
+    deps: [build:release]
+    vars:
+      INSTALL_DIR: '{{.INSTALL_DIR | default "/Applications"}}'
+      DEST: '{{.INSTALL_DIR}}/PictureViewer.app'
+    cmds:
+      - task: bundle
+        vars: { CONFIG: release }
+      - rm -rf "{{.DEST}}"
+      - ditto .build/PictureViewer.app "{{.DEST}}"
+      # Ad-hoc sign the whole bundle; swift build only signs the binary.
+      - codesign --force --sign - "{{.DEST}}"
+
   # ── Quality Gate ──────────────────────────────────────────────────────────
 
   check:all:
