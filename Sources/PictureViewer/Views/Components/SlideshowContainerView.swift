@@ -31,7 +31,9 @@ final class SlideshowZoom: ObservableObject {
   /// Pans by fractions of the visible area; positive values reveal more to the
   /// right and further down. Returns false when the picture can't move that way.
   @discardableResult
-  func pan(x: CGFloat, y: CGFloat) -> Bool { view?.pan(byFractionX: x, y: y) ?? false }
+  func pan(x fractionX: CGFloat, y fractionY: CGFloat) -> Bool {
+    view?.pan(byFractionX: fractionX, y: fractionY) ?? false
+  }
 }
 
 /// Where a picture switched to while zoomed starts, in reading order: the next

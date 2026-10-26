@@ -116,19 +116,24 @@ struct SlideshowImageView: NSViewRepresentable {
 
     case (.flip, true), (.bend, true), (.curl, true), (.book, true):
       // CATransition-based transitions
-      let transition = CATransition()
-      transition.duration = duration
-      transition.timingFunction = timingFunction
-      transition.type = caTransitionType
-      transition.subtype = caTransitionSubtype
-      transition.isRemovedOnCompletion = true
-      (isZoomed ? viewportLayer : imageLayer).add(transition, forKey: "slideTransition")
+      (isZoomed ? viewportLayer : imageLayer).add(pageTransition, forKey: "slideTransition")
       imageLayer.contents = newCGImage
 
     default:
       // First load — no animation, just set the image
       imageLayer.contents = newCGImage
     }
+  }
+
+  /// The `CATransition` for the flip, bend, curl and book types.
+  private var pageTransition: CATransition {
+    let transition = CATransition()
+    transition.duration = duration
+    transition.timingFunction = timingFunction
+    transition.type = caTransitionType
+    transition.subtype = caTransitionSubtype
+    transition.isRemovedOnCompletion = true
+    return transition
   }
 
   /// Timing curve per animation type.

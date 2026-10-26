@@ -54,7 +54,8 @@ PictureViewer/
 │   ├── Views/
 │   │   ├── ContentView.swift               # Root view (gallery + slideshow overlay)
 │   │   ├── GalleryView.swift               # LazyVGrid thumbnail gallery
-│   │   ├── SlideshowView.swift             # Fullscreen slideshow: navigation, auto-play, zoom mode
+│   │   ├── SlideshowView.swift             # Fullscreen slideshow: layout, keyboard, trash prompt
+│   │   ├── SlideshowView+Navigation.swift  # Slideshow navigation, auto-play, zoom mode, trash
 │   │   ├── Components/
 │   │   │   ├── HeaderView.swift            # Top bar: title, sort menu, folder button, play button
 │   │   │   ├── SlideshowImageView.swift    # NSViewRepresentable: CATransition page turns
@@ -63,7 +64,8 @@ PictureViewer/
 │   │   │   ├── SlideshowControlBar.swift   # Slideshow controls (navigation or zoom mode)
 │   │   │   └── TransitionPicker.swift      # Transition menu: cycle or one effect
 │   │   └── Icons/
-│   │       └── LineIcons.swift             # Line-only icon shapes
+│   │       ├── LineIcons.swift             # Line-only icon shapes, 24×24 grid helpers, icon styles
+│   │       └── SlideshowIcons.swift        # Slideshow control icons
 │   └── Theme/
 │       └── DesignSystem.swift              # Pastel color palette + typography + constants
 └── docs/rationale/                         # Why each transition, the tape strips, and zoom work as they do
@@ -114,7 +116,7 @@ Use colon (`:`) as a separator in task names:
 - Caption: Rounded system font at 12pt
 
 ## Icons
-- Line-only `Shape`s in `Views/Icons/LineIcons.swift`, drawn on a 24×24 grid with a 1.5pt round stroke
+- Line-only `Shape`s in `Views/Icons/` (`LineIcons.swift`, plus `SlideshowIcons.swift` for slideshow controls), drawn on a 24×24 grid with a 1.5pt round stroke
 - Consistent sizing via `.lineIconStyle(color:size:)` (or `.filledIconStyle` for play/pause)
 
 # SWIFT-SPECIFIC GUIDELINES

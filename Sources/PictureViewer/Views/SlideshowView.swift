@@ -12,41 +12,40 @@ struct SlideshowView: View {
   let autoPlay: Bool
   let onDismiss: () -> Void
 
-  @EnvironmentObject private var imageStore: ImageStore
-  @State private var currentIndex: Int = 0
-  @State private var isPlaying = false
-  @State private var isAnimating = false
-  @State private var animCycleIdx = 0
-  @State private var currentAnimationType = SlideAnimationType.flip
-  @State private var currentTransitionDuration = DesignSystem.flipDuration
-  @State private var glowCycleIdx = 0
-  @State private var navigatingForward = true
-  @State private var currentNSImage: NSImage?
-  @State private var currentImageSize: CGSize = .zero
-  @State private var isSpeedy = false
+  // Not private: the navigation in `SlideshowView+Navigation.swift` drives this state.
+  @EnvironmentObject var imageStore: ImageStore
+  @State var currentIndex: Int = 0
+  @State var isPlaying = false
+  @State var isAnimating = false
+  @State var animCycleIdx = 0
+  @State var currentAnimationType = SlideAnimationType.flip
+  @State var currentTransitionDuration = DesignSystem.flipDuration
+  @State var glowCycleIdx = 0
+  @State var navigatingForward = true
+  @State var currentNSImage: NSImage?
+  @State var currentImageSize: CGSize = .zero
+  @State var isSpeedy = false
   @AppStorage(SlideTransitionChoice.defaultsKey)
-  private var transitionChoice = SlideTransitionChoice.cycle
-  @StateObject private var zoom = SlideshowZoom()
+  var transitionChoice = SlideTransitionChoice.cycle
+  @StateObject var zoom = SlideshowZoom()
   /// In zoom mode the controls and arrow keys zoom and pan instead of switching pictures.
-  @State private var isZoomMode = false
+  @State var isZoomMode = false
   /// The area between the bars where the unzoomed picture sits.
   @State private var pageFrame: CGRect = .zero
   /// Where the next picture starts while zoomed: reading order by direction.
-  @State private var zoomedStart = ZoomedPictureStart.topLeading
+  @State var zoomedStart = ZoomedPictureStart.topLeading
 
   nonisolated private static let coordinateSpace = "slideshow"
-  /// Arrow-key pan distance, as a fraction of the visible area.
-  private static let keyPanStep: CGFloat = 0.15
 
   // Timer for auto-advance
-  @State private var slideTimer: Timer?
+  @State var slideTimer: Timer?
 
   /// `onKeyPress` only fires for a focused view, so the slideshow takes focus on appear.
-  @FocusState private var isFocused: Bool
+  @FocusState var isFocused: Bool
 
   /// Trashing asks first; auto-play pauses meanwhile so the picture can't change under the prompt.
-  @State private var isConfirmingTrash = false
-  @State private var resumesPlayAfterTrashPrompt = false
+  @State var isConfirmingTrash = false
+  @State var resumesPlayAfterTrashPrompt = false
 
   var body: some View {
     ZStack {
@@ -317,239 +316,4 @@ struct SlideshowView: View {
     }
   }
 
-}
-
-// MARK: - Navigation, Auto-play & Delete
-
-extension SlideshowView {
-
-  // MARK: Navigation
-
-  private func navigateToFirst() {
-    guard !isAnimating, currentIndex != 0 else { return }
-    navigatingForward = false
-    zoomedStart = .topLeading
-    advanceSlide(to: 0)
-    if isPlaying {
-      restartAutoPlayTimer()
-    }
-  }
-
-  private func navigateToLast() {
-    let lastIndex = imageStore.images.count - 1
-    guard !isAnimating, currentIndex < lastIndex else { return }
-    navigatingForward = true
-    zoomedStart = .topLeading
-    advanceSlide(to: lastIndex)
-    if isPlaying {
-      restartAutoPlayTimer()
-    }
-  }
-
-  private func navigateNext() {
-    guard !isAnimating else { return }
-    navigatingForward = true
-    zoomedStart = .topLeading
-    let nextIndex = (currentIndex + 1) % imageStore.images.count
-    advanceSlide(to: nextIndex)
-    if isPlaying {
-      restartAutoPlayTimer()
-    }
-  }
-
-  private func navigatePrev() {
-    guard !isAnimating else { return }
-    navigatingForward = false
-    zoomedStart = .bottomTrailing
-    let prevIndex = (currentIndex - 1 + imageStore.images.count) % imageStore.images.count
-    advanceSlide(to: prevIndex)
-    if isPlaying {
-      restartAutoPlayTimer()
-    }
-  }
-
-  private func advanceSlide(to targetIndex: Int) {
-    guard !isAnimating else { return }
-    isAnimating = true
-
-    // Preload the target image
-    let targetImage = imageStore.fullImage(for: imageStore.images[targetIndex])
-
-    // The SlideshowImageView handles the Core Animation transition.
-    // We update state which triggers the CA transition in the NSView.
-    currentIndex = targetIndex
-    currentNSImage = targetImage
-    currentImageSize = targetImage?.size ?? .zero
-    animCycleIdx += 1
-    // Picked per slide, so a change of setting or speed applies from the next slide.
-    currentAnimationType = transitionChoice.animationType(forTransition: animCycleIdx)
-    currentTransitionDuration = transitionDuration(for: currentAnimationType)
-    glowCycleIdx += 1
-
-    // Reset animation flag after transition completes
-    DispatchQueue.main.asyncAfter(deadline: .now() + currentTransitionDuration) {
-      isAnimating = false
-    }
-  }
-
-  private func transitionDuration(for type: SlideAnimationType) -> TimeInterval {
-    if isSpeedy {
-      switch type {
-      case .flip: return DesignSystem.speedyFlipDuration
-      case .bend: return DesignSystem.speedyBendDuration
-      case .curl: return DesignSystem.speedyCurlDuration
-      case .book: return DesignSystem.speedyBookDuration
-      case .blocks: return DesignSystem.speedyBlocksDuration
-      case .zoomFront: return DesignSystem.speedyZoomFrontDuration
-      case .pixelate: return DesignSystem.speedyPixelateDuration
-      case .spiral: return DesignSystem.speedySpiralDuration
-      }
-    } else {
-      switch type {
-      case .flip: return DesignSystem.flipDuration
-      case .bend: return DesignSystem.bendDuration
-      case .curl: return DesignSystem.curlDuration
-      case .book: return DesignSystem.bookDuration
-      case .blocks: return DesignSystem.blocksDuration
-      case .zoomFront: return DesignSystem.zoomFrontDuration
-      case .pixelate: return DesignSystem.pixelateDuration
-      case .spiral: return DesignSystem.spiralDuration
-      }
-    }
-  }
-
-  // MARK: Zoom mode
-
-  /// Stops auto-play, which would otherwise switch pictures mid-zoom.
-  private func enterZoomMode() {
-    guard !isZoomMode else { return }
-    isZoomMode = true
-    stopAutoPlay()
-  }
-
-  private func exitZoomMode() {
-    isZoomMode = false
-    zoom.fit()
-  }
-
-  private func toggleZoomMode() {
-    if isZoomMode { exitZoomMode() } else { enterZoomMode() }
-  }
-
-  /// Arrows switch pictures, except in zoom mode, where they pan. There,
-  /// Shift+arrow switches pictures, and so does a fresh press once the picture
-  /// can't pan any further that way; a held key stops at the edge.
-  private func handleArrow(_ press: KeyPress, navigate: () -> Void) -> KeyPress.Result {
-    if !isZoomMode || press.modifiers.contains(.shift) {
-      navigate()
-    } else if !pan(toward: press.key), press.phase == .down {
-      navigate()
-    }
-    return .handled
-  }
-
-  /// Returns false when the picture can't move that way.
-  private func pan(toward key: KeyEquivalent) -> Bool {
-    switch key {
-    case .leftArrow: return zoom.pan(x: -Self.keyPanStep, y: 0)
-    case .rightArrow: return zoom.pan(x: Self.keyPanStep, y: 0)
-    case .upArrow: return zoom.pan(x: 0, y: -Self.keyPanStep)
-    case .downArrow: return zoom.pan(x: 0, y: Self.keyPanStep)
-    default: return false
-    }
-  }
-
-  // MARK: Auto-play
-
-  private func togglePlayPause() {
-    if isPlaying {
-      stopAutoPlay()
-    } else {
-      startAutoPlay()
-    }
-  }
-
-  private func startAutoPlay() {
-    isPlaying = true
-    restartAutoPlayTimer()
-  }
-
-  private func stopAutoPlay() {
-    isPlaying = false
-    slideTimer?.invalidate()
-    slideTimer = nil
-  }
-
-  private func restartAutoPlayTimer() {
-    slideTimer?.invalidate()
-    let interval =
-      isSpeedy
-      ? DesignSystem.speedySlideshowInterval
-      : DesignSystem.slideshowInterval
-    slideTimer = Timer.scheduledTimer(
-      withTimeInterval: interval,
-      repeats: true
-    ) { _ in
-      Task { @MainActor in
-        navigateNext()
-      }
-    }
-  }
-
-  private func toggleSpeedyMode() {
-    isSpeedy.toggle()
-    if isPlaying {
-      restartAutoPlayTimer()
-    }
-  }
-
-  // MARK: Delete
-
-  private func requestTrash() {
-    guard !isAnimating, !imageStore.images.isEmpty else { return }
-    resumesPlayAfterTrashPrompt = isPlaying
-    stopAutoPlay()
-    isConfirmingTrash = true
-  }
-
-  /// Resumes auto-play if the prompt paused it, and takes keyboard focus back from the alert.
-  private func finishTrashPrompt() {
-    if resumesPlayAfterTrashPrompt, !imageStore.images.isEmpty {
-      startAutoPlay()
-    }
-    resumesPlayAfterTrashPrompt = false
-    isFocused = true
-  }
-
-  /// Move the current image to Trash via FileManager and advance to the next slide.
-  private func deleteCurrentImage() {
-    guard !isAnimating, !imageStore.images.isEmpty else { return }
-    let item = imageStore.images[currentIndex]
-
-    // Attempt to trash — FileManager.trashItem moves to Trash safely.
-    do {
-      var resultingURL: NSURL?
-      try FileManager.default.trashItem(at: item.url, resultingItemURL: &resultingURL)
-    } catch {
-      // Silently fail — the app is read-oriented; show nothing disruptive.
-      return
-    }
-
-    // Remove from store so gallery also updates
-    imageStore.removeImage(item)
-
-    // If no images left, dismiss slideshow
-    let remaining = imageStore.images
-    if remaining.isEmpty {
-      onDismiss()
-      return
-    }
-
-    // Clamp index and load the next image
-    if currentIndex >= remaining.count {
-      currentIndex = 0
-    }
-    currentNSImage = imageStore.fullImage(for: remaining[currentIndex])
-    currentImageSize = currentNSImage?.size ?? .zero
-  }
 }

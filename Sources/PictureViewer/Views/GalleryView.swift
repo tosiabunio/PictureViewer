@@ -97,7 +97,7 @@ struct ThumbnailCard: View {
         if let thumb = thumbnail {
           Image(nsImage: thumb)
             .resizable()
-            .aspectRatio(contentMode: .fill)
+            .scaledToFill()
             .frame(
               width: DesignSystem.thumbnailSize,
               height: DesignSystem.thumbnailSize
